@@ -1,7 +1,9 @@
 ### Clonar Repositorio
+```
 git clone https://github.com/tuusuario/SistemaEduca-Backend.git
 cd SistemaEduca-Backend
 npm install
+```
 
 ### Correr API
 npm run dev

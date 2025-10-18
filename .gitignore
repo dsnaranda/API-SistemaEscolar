@@ -1,0 +1,60 @@
+# ==============================
+# Node.js / Express ignore file
+# ==============================
+
+# Dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Archivos de entorno
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+logs/*
+debug.log
+error.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Cache de Node
+.cache/
+.tmp/
+temp/
+dist/
+build/
+coverage/
+
+# Archivos de editor
+.vscode/
+.idea/
+*.swp
+
+# Archivos de OS
+*.bak
+*.tmp
+
+# Archivos generados por pruebas
+coverage/
+jest-html-reporters-*.html
+
+# Archivos de deploy o empaquetado
+*.tgz
+*.zip
+
+# Archivos propios de nodemon
+*.pid
+*.seed
+*.pid.lock
+
+/uploads/
+/public/uploads/
+/tests-output/

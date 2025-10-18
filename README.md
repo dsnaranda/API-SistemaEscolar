@@ -6,7 +6,9 @@ npm install
 ```
 
 ### Correr API
+```
 npm run dev
+```
 
 ### 📁 Archivo `.env`
 

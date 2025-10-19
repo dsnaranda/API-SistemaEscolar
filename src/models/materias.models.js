@@ -10,7 +10,13 @@ const MateriaSchema = new mongoose.Schema({
       estudiante_id: { type: mongoose.Schema.Types.ObjectId, ref: 'usuarios' }
     }
   ],
-  promedio_final: { type: Number, default: null },
+  promedios_estudiantes: [
+    {
+      estudiante_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' },
+      promedio_final: { type: Number }
+    }
+  ],
+
   curso_id: { type: mongoose.Schema.Types.ObjectId, ref: 'cursos', required: true }
 }, {
   collection: 'materias'

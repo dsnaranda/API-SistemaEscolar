@@ -4,5 +4,6 @@ const materiaController = require('../controllers/materias.controller');
 
 router.post('/add', materiaController.crearMaterias);
 router.get('/curso/:cursoId', materiaController.obtenerMateriasPorCurso);
+router.put('/finalizar-materia', materiaController.cerrarMateriaPorEstudiante);
 
 module.exports = router;

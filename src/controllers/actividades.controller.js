@@ -21,13 +21,13 @@ const crearActividadPorMateria = async (req, res) => {
       return res.status(400).json({ error: 'materia_id inválido' });
     }
 
-    // 1️⃣ Verificar que la materia exista
+    // Verificar que la materia exista
     const materia = await Materia.findById(materia_id);
     if (!materia) {
       return res.status(404).json({ error: 'Materia no encontrada' });
     }
 
-    // 2️⃣ Buscar los trimestres abiertos con ese número
+    // Buscar los trimestres abiertos con ese número
     const trimestres = await Trimestre.find({
       materia_id,
       numero: numero_trimestre,
@@ -40,7 +40,7 @@ const crearActividadPorMateria = async (req, res) => {
       });
     }
 
-    // 3️⃣ Crear una actividad para cada trimestre (solo los abiertos)
+    // Crear una actividad para cada trimestre (solo los abiertos)
     const nuevasActividades = trimestres.map(t => ({
       parametro,
       trimestre_id: t._id,
@@ -53,7 +53,7 @@ const crearActividadPorMateria = async (req, res) => {
     const resultado = await Actividad.insertMany(nuevasActividades);
 
     res.status(201).json({
-      mensaje: `✅ Se crearon ${resultado.length} actividades en el trimestre ${numero_trimestre} de la materia ${materia.nombre}`,
+      mensaje: `Se crearon ${resultado.length} actividades en el trimestre ${numero_trimestre} de la materia ${materia.nombre}`,
       total_trimestres: trimestres.length,
       actividades_creadas: resultado.map(a => ({
         id: a._id,
@@ -99,7 +99,7 @@ const calificarActividad = async (req, res) => {
     }
 
     res.status(200).json({
-      mensaje: '✅ Actividad calificada correctamente',
+      mensaje: 'Actividad calificada correctamente',
       actividad: {
         id: resultado._id,
         nombre: resultado.nombre,
@@ -113,6 +113,5 @@ const calificarActividad = async (req, res) => {
     res.status(500).json({ error: 'Error al calificar la actividad' });
   }
 };
-
 
 module.exports = { crearActividadPorMateria, calificarActividad };

@@ -21,19 +21,19 @@ const crearTrimestresPorCurso = async (req, res) => {
       return res.status(400).json({ error: 'curso_id inválido' });
     }
 
-    // 1️⃣ Buscar curso y estudiantes
+    // Buscar curso y estudiantes
     const curso = await Curso.findById(curso_id).populate('estudiantes');
     if (!curso) {
       return res.status(404).json({ error: 'Curso no encontrado' });
     }
 
-    // 2️⃣ Buscar materias del curso
+    // Buscar materias del curso
     const materias = await Materia.find({ curso_id });
     if (materias.length === 0) {
       return res.status(404).json({ error: 'No hay materias asociadas a este curso' });
     }
 
-    // 3️⃣ Plantilla de parámetros base
+    // Plantilla de parámetros base
     const parametrosBase = [
       { nombre: 'Lecciones', porcentaje: 20, actividades: [], promedio_parametro: null },
       { nombre: 'Actividad intraclases', porcentaje: 20, actividades: [], promedio_parametro: null },
@@ -46,7 +46,7 @@ const crearTrimestresPorCurso = async (req, res) => {
 
     const nuevosTrimestres = [];
 
-    // 4️⃣ Validaciones antes de insertar
+    // Validaciones antes de insertar
     for (const materia of materias) {
       for (const estudiante of curso.estudiantes) {
         // Buscar si ya tiene trimestres en esa materia
@@ -57,18 +57,18 @@ const crearTrimestresPorCurso = async (req, res) => {
 
         // Limitar máximo 3 trimestres por estudiante
         if (existentes.length >= 3) {
-          console.log(`⛔ ${estudiante.nombres} ${estudiante.apellidos} ya tiene 3 trimestres en ${materia.nombre}`);
+          console.log(`${estudiante.nombres} ${estudiante.apellidos} ya tiene 3 trimestres en ${materia.nombre}`);
           continue;
         }
 
         // Evitar duplicado del mismo número
         const yaExisteNumero = existentes.some(t => t.numero === numero);
         if (yaExisteNumero) {
-          console.log(`⚠️ El trimestre ${numero} ya existe para ${estudiante.nombres} en ${materia.nombre}`);
+          console.log(`El trimestre ${numero} ya existe para ${estudiante.nombres} en ${materia.nombre}`);
           continue;
         }
 
-        // ✅ Crear copia independiente de los parámetros
+        // Crear copia independiente de los parámetros
         const parametrosCopia = JSON.parse(JSON.stringify(parametrosBase));
 
         nuevosTrimestres.push({
@@ -82,18 +82,18 @@ const crearTrimestresPorCurso = async (req, res) => {
       }
     }
 
-    // 5️⃣ Si no hay nada que insertar
+    // Si no hay nada que insertar
     if (nuevosTrimestres.length === 0) {
       return res.status(400).json({
         mensaje: 'No se crearon trimestres porque ya existen o se alcanzó el límite de 3 por materia.'
       });
     }
 
-    // 6️⃣ Insertar en bloque
+    // Insertar en bloque
     const resultado = await Trimestre.insertMany(nuevosTrimestres);
 
     res.status(201).json({
-      mensaje: `✅ Se crearon ${resultado.length} trimestres (número ${numero}) para el curso ${curso.nombre} ${curso.paralelo}`,
+      mensaje: `Se crearon ${resultado.length} trimestres (número ${numero}) para el curso ${curso.nombre} ${curso.paralelo}`,
       total_materias: materias.length,
       total_estudiantes: curso.estudiantes.length,
       creados: resultado.length
@@ -113,19 +113,19 @@ const obtenerTrimestreDetallado = async (req, res) => {
       return res.status(400).json({ error: 'ID de trimestre inválido' });
     }
 
-    // 1️⃣ Buscar el trimestre
+    // Buscar el trimestre
     const trimestre = await Trimestre.findById(id).lean();
     if (!trimestre) {
       return res.status(404).json({ error: 'Trimestre no encontrado' });
     }
 
-    // 2️⃣ Obtener estudiante
+    // Obtener estudiante
     const estudiante = await Usuario.findById(trimestre.estudiante_id).lean();
     const nombreEstudiante = estudiante
       ? `${estudiante.nombres} ${estudiante.apellidos}`
       : 'Estudiante no encontrado';
 
-    // 3️⃣ Obtener materia y curso + docente
+    // Obtener materia y curso + docente
     const materia = await Materia.findById(trimestre.materia_id).lean();
     let nombreMateria = 'Materia no encontrada';
     let nombreDocente = 'Docente no asignado';
@@ -143,7 +143,7 @@ const obtenerTrimestreDetallado = async (req, res) => {
       }
     }
 
-    // 4️⃣ Responder con toda la información
+    // Responder con toda la información
     res.status(200).json({
       _id: trimestre._id,
       numero: trimestre.numero,
@@ -161,4 +161,100 @@ const obtenerTrimestreDetallado = async (req, res) => {
   }
 };
 
-module.exports = { crearTrimestresPorCurso, obtenerTrimestreDetallado };
+const cerrarTrimestreIndividual = async (req, res) => {
+  try {
+    const { trimestre_id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(trimestre_id)) {
+      return res.status(400).json({ error: 'ID de trimestre inválido.' });
+    }
+
+    // Buscar el trimestre
+    const trimestre = await Trimestre.findById(trimestre_id);
+    if (!trimestre) {
+      return res.status(404).json({ error: 'Trimestre no encontrado.' });
+    }
+
+    // Validar que todos los parámetros tengan promedio_parametro != null
+    const incompletos = trimestre.parametros.filter(p => p.promedio_parametro === null);
+
+    if (incompletos.length > 0) {
+      return res.status(400).json({
+        error: 'El trimestre no puede cerrarse. Existen parámetros sin promedio.',
+        parametros_pendientes: incompletos.map(p => p.nombre)
+      });
+    }
+
+    // Solo cambiar estado (el trigger hará el cálculo)
+    await Trimestre.updateOne(
+      { _id: trimestre_id },
+      { $set: { estado: 'cerrado' } }
+    );
+
+    res.status(200).json({
+      mensaje: 'Trimestre cerrado correctamente.',
+      trimestre_id
+    });
+  } catch (error) {
+    console.error('Error al cerrar trimestre individual:', error);
+    res.status(500).json({ error: 'Error interno al cerrar trimestre.' });
+  }
+};
+
+
+const cerrarTrimestresPorMateria = async (req, res) => {
+  try {
+    const { materia_id, numero } = req.body;
+
+    if (!materia_id || !numero) {
+      return res.status(400).json({ error: 'Debe enviar materia_id y número de trimestre.' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(materia_id)) {
+      return res.status(400).json({ error: 'ID de materia inválido.' });
+    }
+
+    // Buscar trimestres abiertos de esa materia y número
+    const trimestres = await Trimestre.find({ materia_id, numero, estado: 'abierto' });
+
+    if (trimestres.length === 0) {
+      return res.status(404).json({ error: 'No hay trimestres abiertos para cerrar.' });
+    }
+
+    const cerrados = [];
+    const pendientes = [];
+
+    for (const trimestre of trimestres) {
+      const incompletos = trimestre.parametros.filter(p => p.promedio_parametro === null);
+
+      if (incompletos.length > 0) {
+        pendientes.push({
+          estudiante_id: trimestre.estudiante_id,
+          parametros_pendientes: incompletos.map(p => p.nombre)
+        });
+        continue;
+      }
+
+      // Cambiar estado (el trigger hará el cálculo)
+      await Trimestre.updateOne(
+        { _id: trimestre._id },
+        { $set: { estado: 'cerrado' } }
+      );
+
+      cerrados.push(trimestre._id);
+    }
+
+    res.status(200).json({
+      mensaje: 'Cierre de trimestres completado.',
+      total_trimestres: trimestres.length,
+      cerrados: cerrados.length,
+      pendientes: pendientes.length,
+      detalles_pendientes: pendientes
+    });
+  } catch (error) {
+    console.error('Error al cerrar trimestres por materia:', error);
+    res.status(500).json({ error: 'Error interno al cerrar trimestres.' });
+  }
+};
+
+module.exports = { crearTrimestresPorCurso, obtenerTrimestreDetallado, cerrarTrimestreIndividual, cerrarTrimestresPorMateria };

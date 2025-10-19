@@ -33,7 +33,7 @@ const obtenerAsistenciaCurso = async (req, res) => {
       .select('nombres apellidos')
       .lean();
 
-    // 3) Asistencias del curso en esa fecha (fecha es STRING)
+    // Asistencias del curso en esa fecha (fecha es STRING)
     const asistencias = await Asistencia.find({
       curso_id: cursoObjectId,
       fecha: fechaNormalizada
@@ -55,10 +55,10 @@ const obtenerAsistenciaCurso = async (req, res) => {
       console.log(JSON.stringify(asistencias.slice(0, 3), null, 2));
     }
 
-    // 4) Mapa estudianteId -> estado
+    // Mapa estudianteId -> estado
     const mapaAsistencia = new Map(asistencias.map(a => [a.estudiante_id.toString(), a.estado]));
 
-    // 5) Unimos estudiante + estado (NO ponemos "Ausente" por defecto; si no existe registro = null)
+    // Unimos estudiante + estado (NO ponemos "Ausente" por defecto; si no existe registro = null)
     const estudiantesConEstado = estudiantes.map(e => ({
       id: e._id.toString(),
       nombres: e.nombres,
@@ -66,11 +66,11 @@ const obtenerAsistenciaCurso = async (req, res) => {
       estado: mapaAsistencia.get(e._id.toString()) ?? null
     }));
 
-    // 6) Totales SOLO contados desde documentos reales de asistencia
+    // Totales SOLO contados desde documentos reales de asistencia
     const total_presentes = asistencias.filter(a => a.estado === 'Presente').length;
     const total_ausentes  = asistencias.filter(a => a.estado === 'Ausente').length;
 
-    // 7) Respuesta
+    // Respuesta
     res.json({
       curso_id: cursoId,
       curso_nombre: curso ? curso.nombre : 'Curso desconocido',
@@ -81,7 +81,7 @@ const obtenerAsistenciaCurso = async (req, res) => {
       estudiantes: estudiantesConEstado
     });
   } catch (error) {
-    console.error('❌ Error al obtener asistencia:', error);
+    console.error('Error al obtener asistencia:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
@@ -143,7 +143,7 @@ const registrarAsistenciaCurso = async (req, res) => {
     const total_justificados = estudiantes.filter(e => e.estado === 'Justificado').length;
 
     res.status(200).json({
-      mensaje: `✅ Asistencia registrada para el curso ${curso.nombre} ${curso.paralelo}`,
+      mensaje: `Asistencia registrada para el curso ${curso.nombre} ${curso.paralelo}`,
       fecha,
       total_estudiantes: estudiantes.length,
       total_presentes,
@@ -155,8 +155,9 @@ const registrarAsistenciaCurso = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error al registrar asistencia:', error);
+    console.error('Error al registrar asistencia:', error);
     res.status(500).json({ error: 'Error interno al registrar asistencia.' });
   }
 };
+
 module.exports = { obtenerAsistenciaCurso, registrarAsistenciaCurso };

@@ -1,6 +1,3 @@
-// ===============================
-//  IMPORTS Y CONFIGURACIONES
-// ===============================
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -19,23 +16,20 @@ const actividadRoutes = require('./src/routes/actividades.routes');
 // Inicializar app
 const app = express();
 
-// ===============================
 //  MIDDLEWARES
-// ===============================
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }));
 app.use(express.json());
 
-// ===============================
 //  CONEXIÓN A MONGODB
-// ===============================
+
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log('✅ Conexión a MongoDB exitosa'))
   .catch((err) => console.error('❌ Error al conectar a MongoDB:', err.message));
 
-// ===============================
+
 //  RUTAS
-// ===============================
+
 app.get('/', (req, res) => {
   res.send(`
     <html>
@@ -83,17 +77,14 @@ app.use('/materias', materiaRoutes);
 app.use('/trimestres', trimestreRoutes);
 app.use('/actividades', actividadRoutes);
 
-// ===============================
 //  CONFIGURACIÓN DE PUERTO
-// ===============================
-const PORT = process.env.PORT || 3001;
 
-// Solo iniciar servidor localmente (Vercel lo maneja automáticamente)
+const PORT = process.env.PORT || 3001;
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   });
 }
 
-// Exportar app para Vercel
+// Exportar app
 module.exports = app;

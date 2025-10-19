@@ -1,77 +1,99 @@
+// ===============================
+//  IMPORTS Y CONFIGURACIONES
+// ===============================
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const Router  = require('express');
+const dotenv = require('dotenv');
+
+// Cargar variables del .env
+dotenv.config();
+
 const usuarioRoutes = require('./src/routes/usuarios.routes');
 const asistenciaRoutes = require('./src/routes/asistencia.routes');
-const cursosRoutes = require('./src/routes/cursos.routes');
-const materiasRoutes = require('./src/routes/materias.routes');
-const trimestresRoutes = require('./src/routes/trimestre.routes');
+const cursoRoutes = require('./src/routes/cursos.routes');
+const materiaRoutes = require('./src/routes/materias.routes');
+const trimestreRoutes = require('./src/routes/trimestre.routes');
 const actividadRoutes = require('./src/routes/actividades.routes');
-require('dotenv').config();
 
-const router = Router();
+// Inicializar app
 const app = express();
-const port = process.env.PORT;
 
-app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }));
+// ===============================
+//  MIDDLEWARES
+// ===============================
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }));
 app.use(express.json());
 
-app.get("/", (req, res) => {
-    const htmlResponse = `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>API Encuestas</title>
+// ===============================
+//  CONEXIÓN A MONGODB
+// ===============================
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log('✅ Conexión a MongoDB exitosa'))
+  .catch((err) => console.error('❌ Error al conectar a MongoDB:', err.message));
+
+// ===============================
+//  RUTAS
+// ===============================
+app.get('/', (req, res) => {
+  res.send(`
+    <html>
+      <head>
+        <title>API SistemaEduca</title>
         <style>
-            body {
-                font-family: Arial, sans-serif;
-                text-align: center;
-                margin: 50px;
-                background-color: #f4f4f4;
-            }
-            h1 {
-                color: #333;
-            }
-            p {
-                font-size: 18px;
-                color: #666;
-            }
-            .container {
-                background: white;
-                padding: 20px;
-                border-radius: 10px;
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-                display: inline-block;
-            }
+          body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+          }
+          .card {
+            background: white;
+            padding: 25px 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+          }
+          h1 {
+            color: #333;
+          }
+          p {
+            color: #555;
+          }
         </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>API SistemaEduca is UP</h1>
+      </head>
+      <body>
+        <div class="card">
+          <h1>✅ API SistemaEduca está activa</h1>
+          <p>Conectada a MongoDB Atlas correctamente.</p>
         </div>
-    </body>
+      </body>
     </html>
-    `;
-    res.send(htmlResponse);
+  `);
 });
 
-
-// Ruta base
+// Registrar rutas
 app.use('/usuarios', usuarioRoutes);
 app.use('/asistencia', asistenciaRoutes);
-app.use('/cursos', cursosRoutes);
-app.use('/materias', materiasRoutes);
-app.use('/trimestres', trimestresRoutes);
+app.use('/cursos', cursoRoutes);
+app.use('/materias', materiaRoutes);
+app.use('/trimestres', trimestreRoutes);
 app.use('/actividades', actividadRoutes);
 
-// Conexión a MongoDB
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('Conexión a MongoDB exitosa'))
-    .catch((err) => console.error('Error al conectar a MongoDB:', err));
+// ===============================
+//  CONFIGURACIÓN DE PUERTO
+// ===============================
+const PORT = process.env.PORT || 3001;
 
-app.listen(port, () => {
-    console.log(`Servidor corriendo en http://localhost:${port}`);
-});
+// Solo iniciar servidor localmente (Vercel lo maneja automáticamente)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+  });
+}
+
+// Exportar app para Vercel
+module.exports = app;

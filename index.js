@@ -22,11 +22,12 @@ app.use(express.json());
 
 //  CONEXIÓN A MONGODB
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ Conexión a MongoDB exitosa'))
-  .catch((err) => console.error('❌ Error al conectar a MongoDB:', err.message));
-
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 50000, 
+  socketTimeoutMS: 45000,
+})
+.then(() => console.log('✅ Conexión a MongoDB exitosa'))
+.catch(err => console.error('❌ Error al conectar a MongoDB:', err.message));
 
 //  RUTAS
 

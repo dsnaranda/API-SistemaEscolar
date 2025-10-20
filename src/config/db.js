@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const MONGO_URI = process.env.MONGO_URI;
 
 if (!MONGO_URI) {
-  throw new Error('❌ MONGO_URI no está definida en las variables de entorno');
+  throw new Error('MONGO_URI no está definida en las variables de entorno');
 }
 
 // Cache global para Vercel (evita reconexiones innecesarias)
@@ -23,11 +23,11 @@ async function connectDB() {
       socketTimeoutMS: 45000,
     })
     .then((mongoose) => {
-      console.log('✅ Conectado a MongoDB Atlas');
+      console.log('Conectado a MongoDB Atlas');
       return mongoose;
     })
     .catch((err) => {
-      console.error('❌ Error al conectar a MongoDB:', err.message);
+      console.error('Error al conectar a MongoDB:', err.message);
       throw err;
     });
   }

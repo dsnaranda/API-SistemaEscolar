@@ -2,10 +2,12 @@ const mongoose = require('mongoose');
 const Materia = require('../models/materias.models');
 const Curso = require('../models/cursos.models');
 const Trimestre = require('../models/trimestres.models');
+const connectDB = require('../config/db');
 
 // Crear una o varias materias asociadas a un curso
 const crearMaterias = async (req, res) => {
   try {
+    await connectDB();
     const { curso_id, materias } = req.body;
 
     // Validar datos de entrada
@@ -47,7 +49,7 @@ const crearMaterias = async (req, res) => {
     const resultado = await Materia.insertMany(nuevasMaterias);
 
     res.status(201).json({
-      mensaje: `✅ ${resultado.length} materia(s) agregada(s) correctamente al curso ${curso.nombre} ${curso.paralelo}`,
+      mensaje: `${resultado.length} materia(s) agregada(s) correctamente al curso ${curso.nombre} ${curso.paralelo}`,
       materias: resultado.map(m => ({
         id: m._id,
         nombre: m.nombre,
@@ -55,7 +57,7 @@ const crearMaterias = async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('❌ Error al crear materias:', error);
+    console.error('Error al crear materias:', error);
     res.status(500).json({ error: 'Error al crear materias.' });
   }
 };
@@ -63,6 +65,7 @@ const crearMaterias = async (req, res) => {
 // Obtener materias por curso
 const obtenerMateriasPorCurso = async (req, res) => {
   try {
+    await connectDB();
     const { cursoId } = req.params;
 
     // Validar ID de curso
@@ -90,6 +93,7 @@ const obtenerMateriasPorCurso = async (req, res) => {
 
 const cerrarMateriaPorEstudiante = async (req, res) => {
   try {
+    await connectDB();
     const { materia_id, estudiante_id } = req.body;
 
     if (!materia_id || !estudiante_id) {

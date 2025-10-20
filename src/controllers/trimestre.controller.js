@@ -3,10 +3,12 @@ const Materia = require('../models/materias.models');
 const Curso = require('../models/cursos.models');
 const Usuario = require('../models/usuarios.models');
 const mongoose = require('mongoose');
+const connectDB = require('../config/db');
 
 // Crear trimestres masivamente para todas las materias y estudiantes del curso
 const crearTrimestresPorCurso = async (req, res) => {
   try {
+    await connectDB();
     const { curso_id, numero } = req.body;
 
     if (!curso_id || !numero) {
@@ -107,6 +109,7 @@ const crearTrimestresPorCurso = async (req, res) => {
 
 const obtenerTrimestreDetallado = async (req, res) => {
   try {
+    await connectDB();
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -163,6 +166,7 @@ const obtenerTrimestreDetallado = async (req, res) => {
 
 const cerrarTrimestreIndividual = async (req, res) => {
   try {
+    await connectDB();
     const { trimestre_id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(trimestre_id)) {
@@ -204,6 +208,7 @@ const cerrarTrimestreIndividual = async (req, res) => {
 
 const cerrarTrimestresPorMateria = async (req, res) => {
   try {
+    await connectDB();
     const { materia_id, numero } = req.body;
 
     if (!materia_id || !numero) {

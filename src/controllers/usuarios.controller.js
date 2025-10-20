@@ -2,10 +2,12 @@ const Usuario = require('../models/usuarios.models');
 const Curso = require('../models/cursos.models'); //
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const connectDB = require('../config/db');
 
 // Obtener todos los usuarios
 const obtenerUsuarios = async (req, res) => {
   try {
+    await connectDB();
     const usuarios = await Usuario.find();
     res.json(usuarios);
   } catch (error) {
@@ -17,6 +19,7 @@ const obtenerUsuarios = async (req, res) => {
 // Login de usuario
 const loginUsuario = async (req, res) => {
   try {
+    await connectDB();
     const { email, password } = req.body;
 
     // Verificar si el usuario existe
@@ -70,6 +73,7 @@ const loginUsuario = async (req, res) => {
 
 const obtenerEstudiantesPorCurso = async (req, res) => {
   try {
+    await connectDB();
     const { cursoId } = req.params;
 
     // Buscar el curso
@@ -98,9 +102,9 @@ const obtenerEstudiantesPorCurso = async (req, res) => {
       paralelo: curso.paralelo,
       docente: docente
         ? {
-            id: docente._id,
-            nombre: `${docente.nombres} ${docente.apellidos}`
-          }
+          id: docente._id,
+          nombre: `${docente.nombres} ${docente.apellidos}`
+        }
         : { mensaje: 'Docente no asignado' },
       total_estudiantes: estudiantes.length,
       estudiantes: estudiantes.map((e) => ({
@@ -120,6 +124,7 @@ const obtenerEstudiantesPorCurso = async (req, res) => {
 // Crear (insertar) un nuevo profesor
 const crearProfesor = async (req, res) => {
   try {
+    await connectDB();
     const { nombres, apellidos, ci, email, password } = req.body;
 
     // Validar campos obligatorios
@@ -170,6 +175,7 @@ const crearProfesor = async (req, res) => {
 
 const addEstudiantesEnCursos = async (req, res) => {
   try {
+    await connectDB();
     const { curso_id, estudiantes } = req.body;
 
     // Validar datos

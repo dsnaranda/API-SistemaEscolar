@@ -1,15 +1,17 @@
 const mongoose = require('mongoose');
 const Curso = require('../models/cursos.models');
-const Asistencia = require('../models/asistencia.models'); // <- usa la colección 'asistencia'
+const Asistencia = require('../models/asistencia.models');
 const Usuario = require('../models/usuarios.models');
+const connectDB = require('../config/db');
 
 const obtenerAsistenciaCurso = async (req, res) => {
   try {
+    await connectDB();
     const { cursoId } = req.params;
     const { fecha } = req.query;
 
     if (!cursoId) return res.status(400).json({ error: 'Falta cursoId en la URL' });
-    if (!fecha)   return res.status(400).json({ error: 'Debes proporcionar la fecha (?fecha=YYYY-MM-DD)' });
+    if (!fecha) return res.status(400).json({ error: 'Debes proporcionar la fecha (?fecha=YYYY-MM-DD)' });
 
     const cursoObjectId = new mongoose.Types.ObjectId(cursoId);
     const fechaNormalizada = (fecha || '').trim();
@@ -68,7 +70,7 @@ const obtenerAsistenciaCurso = async (req, res) => {
 
     // Totales SOLO contados desde documentos reales de asistencia
     const total_presentes = asistencias.filter(a => a.estado === 'Presente').length;
-    const total_ausentes  = asistencias.filter(a => a.estado === 'Ausente').length;
+    const total_ausentes = asistencias.filter(a => a.estado === 'Ausente').length;
 
     // Respuesta
     res.json({
@@ -88,6 +90,7 @@ const obtenerAsistenciaCurso = async (req, res) => {
 
 const registrarAsistenciaCurso = async (req, res) => {
   try {
+    await connectDB();
     let { curso_id, fecha, estudiantes } = req.body;
 
     // Validaciones básicas

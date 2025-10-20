@@ -2,10 +2,12 @@ const Actividad = require('../models/actividades.models');
 const Trimestre = require('../models/trimestres.models');
 const Materia = require('../models/materias.models');
 const mongoose = require('mongoose');
+const connectDB = require('../config/db'); // 👈 Importar conexión
 
 // Crear una actividad para todos los trimestres de una materia en un trimestre específico
 const crearActividadPorMateria = async (req, res) => {
   try {
+    await connectDB();
     const { materia_id, parametro, nombre, descripcion, nota = 0, numero_trimestre } = req.body;
 
     // Validar datos obligatorios
@@ -70,6 +72,7 @@ const crearActividadPorMateria = async (req, res) => {
 // Actualizar nota y fecha de calificación de una actividad
 const calificarActividad = async (req, res) => {
   try {
+    await connectDB();
     const { actividad_id } = req.params;
     const { nota } = req.body;
 

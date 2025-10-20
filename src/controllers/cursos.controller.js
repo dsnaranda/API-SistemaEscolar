@@ -2,10 +2,12 @@ const Curso = require('../models/cursos.models');
 const Usuario = require('../models/usuarios.models');
 const Materia = require('../models/materias.models');
 const mongoose = require('mongoose');
+const connectDB = require('../config/db');
 
 // Crear un nuevo curso
 const crearCurso = async (req, res) => {
   try {
+    await connectDB();
     const { nombre, nivel, paralelo, docente_id } = req.body;
 
     // Validar campos
@@ -64,6 +66,7 @@ const crearCurso = async (req, res) => {
 
 const finalizarPromediosCurso = async (req, res) => {
   try {
+    await connectDB();
     const { curso_id, estudiante_id } = req.body;
 
     if (!curso_id) {

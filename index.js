@@ -21,15 +21,10 @@ app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }));
 app.use(express.json());
 
 //  CONEXIÓN A MONGODB
+const connectDB = require('./src/config/db');
+connectDB();
 
-mongoose.connect(process.env.MONGO_URI, {
-  serverSelectionTimeoutMS: 50000, 
-  socketTimeoutMS: 45000,
-})
-.then(() => console.log('✅ Conexión a MongoDB exitosa'))
-.catch(err => console.error('❌ Error al conectar a MongoDB:', err.message));
-
-//  RUTAS
+//  Pagina de Inicio
 
 app.get('/', (req, res) => {
   res.send(`
@@ -77,6 +72,16 @@ app.use('/cursos', cursoRoutes);
 app.use('/materias', materiaRoutes);
 app.use('/trimestres', trimestreRoutes);
 app.use('/actividades', actividadRoutes);
+
+app.get('/ping', async (req, res) => {
+  try {
+    await connectDB();
+    res.send('Conexión a MongoDB Atlas exitosa');
+  } catch (err) {
+    console.error('Error de conexión en /ping:', err.message);
+    res.status(500).send('Error al conectar a MongoDB');
+  }
+});
 
 //  CONFIGURACIÓN DE PUERTO
 

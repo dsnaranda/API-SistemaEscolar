@@ -3,6 +3,7 @@ const Curso = require('../models/cursos.models');
 const Asistencia = require('../models/asistencia.models');
 const Usuario = require('../models/usuarios.models');
 const connectDB = require('../config/db');
+const { enviarCorreo } = require('../utils/email');
 
 const obtenerAsistenciaCurso = async (req, res) => {
   try {
@@ -102,15 +103,14 @@ const registrarAsistenciaCurso = async (req, res) => {
       return res.status(400).json({ error: 'ID de curso inválido.' });
     }
 
-    // Si no se envía la fecha, usar la fecha actual
+    // Fecha por defecto si no se envía
     if (!fecha) {
       const hoy = new Date();
       const yyyy = hoy.getFullYear();
       const mm = String(hoy.getMonth() + 1).padStart(2, '0');
       const dd = String(hoy.getDate()).padStart(2, '0');
-      fecha = `${yyyy}-${mm}-${dd}`; // 👉 Formato "YYYY-MM-DD"
+      fecha = `${yyyy}-${mm}-${dd}`;
     } else {
-      // Normalizar si viene con espacios
       fecha = fecha.trim();
     }
 
@@ -120,7 +120,14 @@ const registrarAsistenciaCurso = async (req, res) => {
       return res.status(404).json({ error: 'Curso no encontrado.' });
     }
 
-    // Procesar estudiantes (inserta o actualiza si ya existe ese día)
+    // Detectar los ausentes
+    const inasistentes = estudiantes
+      .filter(e => e.estado === 'Ausente')
+      .map(e => new mongoose.Types.ObjectId(e.id));
+
+    console.log("➡️ Inasistentes detectados:", inasistentes);
+
+    // Ejecutar operaciones en bloque (insertar/actualizar)
     const operaciones = estudiantes.map(est => ({
       updateOne: {
         filter: {
@@ -128,23 +135,77 @@ const registrarAsistenciaCurso = async (req, res) => {
           estudiante_id: new mongoose.Types.ObjectId(est.id),
           fecha: fecha
         },
-        update: {
-          $set: {
-            estado: est.estado
-          }
-        },
+        update: { $set: { estado: est.estado } },
         upsert: true
       }
     }));
 
-    // Ejecutar todas las operaciones en bloque
     const resultado = await Asistencia.bulkWrite(operaciones);
+
+    // Buscar correos solo de los ausentes
+    if (inasistentes.length > 0) {
+      console.log("🔍 Buscando correos de los ausentes...");
+      const ausentesInfo = await Usuario.find({ _id: { $in: inasistentes } })
+        .select("nombres apellidos email")
+        .lean();
+
+      console.log("🧾 Usuarios encontrados:", ausentesInfo);
+
+      for (const user of ausentesInfo) {
+        if (!user.email) {
+          console.warn(`⚠️ El estudiante ${user.nombres} ${user.apellidos} no tiene campo "email" en su registro.`);
+          continue;
+        }
+
+        const asunto = `Notificación de Inasistencia - ${curso.nombre} ${curso.paralelo}`;
+        const mensaje = `
+            <div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f5f7fa; padding: 30px;">
+            <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; box-shadow: 0 3px 8px rgba(0,0,0,0.05); overflow: hidden;">
+              <div style=" background: linear-gradient(90deg, #007bff, #0056b3); color: white; padding: 15px 25px; font-size: 18px; font-weight: bold; text-align: center; letter-spacing: 0.5px;">
+                Notificación de Inasistencia
+              </div>
+              <div style="padding: 25px; color: #333333;">
+                <p>Estimado/a <strong>${user.nombres} ${user.apellidos}</strong>,</p>
+                <p>
+                  Se ha registrado una <strong>inasistencia</strong> el día 
+                  <strong>${fecha}</strong> en el curso 
+                  <strong>${curso.nombre} ${curso.paralelo}</strong>.
+                </p>
+                <p>
+                  Por favor, justifique su ausencia si corresponde. Si considera que esta notificación es un error,
+                  comuníquese con el docente o el área administrativa.
+                </p>
+                <div style="border-left: 4px solid #007bff; padding-left: 10px; margin: 20px 0; color: #555; font-style: italic;">
+                  “La asistencia constante es clave para tu éxito académico.”
+                </div>
+                <p style="margin-top: 30px;">Atentamente,</p>
+                <p style="font-weight: bold; color: #007bff;">Sistema Escolar</p>
+              </div>
+              <div style="background-color: #f0f3f7; padding: 10px; text-align: center; font-size: 12px; color: #777;">
+                © ${new Date().getFullYear()} Sistema Escolar - Todos los derechos reservados.
+              </div>
+            </div>
+          </div>
+          `;
+
+        console.log(`Intentando enviar correo a: ${user.email} ...`);
+        try {
+          await enviarCorreo(user.email, asunto, mensaje);
+          console.log(`Correo enviado correctamente a ${user.email}`);
+        } catch (err) {
+          console.error(`Error al enviar correo a ${user.email}:`, err.message);
+        }
+      }
+    } else {
+      console.log("✅ No hay ausentes, no se envían correos.");
+    }
 
     // Contar estados
     const total_presentes = estudiantes.filter(e => e.estado === 'Presente').length;
     const total_ausentes = estudiantes.filter(e => e.estado === 'Ausente').length;
     const total_justificados = estudiantes.filter(e => e.estado === 'Justificado').length;
 
+    // Respuesta final
     res.status(200).json({
       mensaje: `Asistencia registrada para el curso ${curso.nombre} ${curso.paralelo}`,
       fecha,
@@ -155,8 +216,10 @@ const registrarAsistenciaCurso = async (req, res) => {
       resumen_db: {
         insertados: resultado.upsertedCount,
         modificados: resultado.modifiedCount
-      }
+      },
+      correos_enviados: inasistentes.length
     });
+
   } catch (error) {
     console.error('Error al registrar asistencia:', error);
     res.status(500).json({ error: 'Error interno al registrar asistencia.' });

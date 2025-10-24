@@ -3,6 +3,7 @@ const Curso = require('../models/cursos.models'); //
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const connectDB = require('../config/db');
+const { enviarCorreo } = require('../utils/email');
 
 // Obtener todos los usuarios
 const obtenerUsuarios = async (req, res) => {
@@ -121,7 +122,7 @@ const obtenerEstudiantesPorCurso = async (req, res) => {
   }
 };
 
-// Crear (insertar) un nuevo profesor
+// Crear un nuevo profesor
 const crearProfesor = async (req, res) => {
   try {
     await connectDB();
@@ -178,24 +179,24 @@ const addEstudiantesEnCursos = async (req, res) => {
     await connectDB();
     const { curso_id, estudiantes } = req.body;
 
-    // 🔹 Validar datos
+    // Validar datos
     if (!curso_id || !Array.isArray(estudiantes) || estudiantes.length === 0) {
       return res
         .status(400)
         .json({ error: 'Debe enviar un curso_id y un arreglo de estudiantes' });
     }
 
-    // 🔹 Verificar que el curso exista
+    // Verificar que el curso exista
     const curso = await Curso.findById(curso_id);
     if (!curso) {
       return res.status(404).json({ error: 'Curso no encontrado' });
     }
 
-    // 🔹 Obtener todas las cédulas y correos enviados
+    // Obtener todas las cédulas y correos enviados
     const ciList = estudiantes.map((e) => e.ci);
     const emailList = estudiantes.map((e) => e.email);
 
-    // 🔹 Buscar duplicados existentes en la base de datos
+    // Buscar duplicados existentes en la base de datos
     const duplicados = await Usuario.find({
       $or: [{ ci: { $in: ciList } }, { email: { $in: emailList } }],
     });
@@ -211,7 +212,7 @@ const addEstudiantesEnCursos = async (req, res) => {
       });
     }
 
-    // 🔹 Procesar estudiantes (hash de contraseñas)
+    // Procesar estudiantes (hash de contraseñas)
     const nuevosEstudiantes = estudiantes.map((est) => {
       const salt = crypto.randomBytes(16).toString('hex');
       const hash = crypto
@@ -235,7 +236,7 @@ const addEstudiantesEnCursos = async (req, res) => {
     const resultado = await Usuario.insertMany(nuevosEstudiantes);
 
     res.status(201).json({
-      mensaje: `✅ ${resultado.length} estudiantes agregados correctamente al curso ${curso.nombre} ${curso.paralelo}`,
+      mensaje: `${resultado.length} estudiantes agregados correctamente al curso ${curso.nombre} ${curso.paralelo}`,
       estudiantes: resultado.map((e) => ({
         id: e._id,
         nombres: e.nombres,
@@ -251,4 +252,110 @@ const addEstudiantesEnCursos = async (req, res) => {
 };
 
 
-module.exports = { obtenerUsuarios, loginUsuario, obtenerEstudiantesPorCurso, crearProfesor, addEstudiantesEnCursos };
+const verificarCorreo = async (req, res) => {
+  try {
+    await connectDB();
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Debe proporcionar un correo electrónico' });
+    }
+
+    // Buscar usuario por correo
+    const usuario = await Usuario.findOne({ email });
+    if (!usuario) {
+      return res.status(404).json({
+        existe: false,
+        mensaje: 'El correo no está registrado',
+      });
+    }
+
+    // URL del frontend 
+    const frontendUrl = `http://localhost:4200/changepassword/${usuario._id}`;
+
+    // Cuerpo del mensaje HTML
+    const mensajeHTML = `
+      <div style="font-family: Arial, sans-serif; background-color: #f8f9fa; padding: 20px; border-radius: 10px;">
+        <h2 style="color: #4F46E5;">Recuperación de contraseña</h2>
+        <p>Hola <b>${usuario.nombres} ${usuario.apellidos}</b>,</p>
+        <p>Has solicitado recuperar tu contraseña. Haz clic en el siguiente botón para establecer una nueva:</p>
+        <p style="text-align:center; margin-top: 15px;">
+          <a href="${frontendUrl}" 
+             style="display: inline-block; background-color: #4F46E5; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none;">
+             Cambiar contraseña
+          </a>
+        </p>
+        <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">
+          Si no solicitaste este cambio, ignora este mensaje. 
+          Este enlace es válido solo para el usuario con el correo <b>${usuario.email}</b>.
+        </p>
+      </div>
+    `;
+
+    // Asunto y texto
+    const asunto = 'Recuperación de contraseña - Sistema Escolar';
+    const texto = `Hola ${usuario.nombres}, haz clic en el siguiente enlace para cambiar tu contraseña: ${frontendUrl}`;
+
+    // Enviar correo usando tu función utilitaria
+    await enviarCorreo(usuario.email, asunto, mensajeHTML);
+
+    // Respuesta al frontend
+    res.status(200).json({
+      existe: true,
+      mensaje: 'Se ha enviado un enlace de recuperación al correo registrado.',
+      usuario: {
+        id: usuario._id,
+        nombres: usuario.nombres,
+        apellidos: usuario.apellidos,
+        email: usuario.email,
+      },
+    });
+  } catch (error) {
+    console.error('Error al verificar el correo:', error);
+    res.status(500).json({ error: 'Error al verificar el correo o enviar el correo electrónico.' });
+  }
+};
+
+const cambiarContrasena = async (req, res) => {
+  try {
+    await connectDB();
+
+    const { id } = req.params;
+    const { password } = req.body;
+
+    // Validar datos
+    if (!id || !password) {
+      return res.status(400).json({ error: 'Debe proporcionar el ID del usuario y una nueva contraseña.' });
+    }
+
+    // Buscar usuario
+    const usuario = await Usuario.findById(id);
+    if (!usuario) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    // Generar nuevo hash de la contraseña
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.createHmac('sha256', salt).update(password).digest('hex');
+    const passwordHash = `sha256$${salt}$${hash}`;
+
+    // Actualizar la contraseña
+    usuario.password = passwordHash;
+    await usuario.save();
+
+    res.status(200).json({
+      mensaje: 'Contraseña actualizada correctamente.',
+      usuario: {
+        id: usuario._id,
+        nombres: usuario.nombres,
+        apellidos: usuario.apellidos,
+        email: usuario.email,
+      },
+    });
+  } catch (error) {
+    console.error('Error al cambiar la contraseña:', error);
+    res.status(500).json({ error: 'Error interno al cambiar la contraseña.' });
+  }
+};
+
+module.exports = { obtenerUsuarios, loginUsuario, obtenerEstudiantesPorCurso, crearProfesor, addEstudiantesEnCursos, verificarCorreo, cambiarContrasena };

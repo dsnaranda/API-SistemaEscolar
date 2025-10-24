@@ -7,5 +7,7 @@ router.post('/login', usuarioController.loginUsuario);
 router.get('/curso/:cursoId/estudiantes', usuarioController.obtenerEstudiantesPorCurso);
 router.post('/addprofesores', usuarioController.crearProfesor);
 router.post('/addestudiantes', usuarioController.addEstudiantesEnCursos);
+router.post('/verificar-correo', usuarioController.verificarCorreo);
+router.put('/cambiar-contrasena/:id', usuarioController.cambiarContrasena);
 
 module.exports = router;

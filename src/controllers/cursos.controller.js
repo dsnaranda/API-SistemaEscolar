@@ -10,34 +10,41 @@ const crearCurso = async (req, res) => {
     await connectDB();
     const { nombre, nivel, paralelo, docente_id } = req.body;
 
-    // Validar campos
+    // Validar campos obligatorios
     if (!nombre || !nivel || !paralelo || !docente_id) {
       return res.status(400).json({ error: 'Todos los campos son obligatorios' });
     }
 
-    // Verificar si el docente existe y es rol docente
+    // Verificar si el docente existe y tiene rol docente
     const docente = await Usuario.findById(docente_id);
     if (!docente || docente.rol !== 'docente') {
       return res.status(400).json({ error: 'El docente_id no es válido o no pertenece a un docente' });
     }
 
-    // Verificar si el docente ya tiene un curso asignado
-    const cursoDocente = await Curso.findOne({ docente_id });
-    if (cursoDocente) {
+    // Verificar si el docente ya dicta exactamente ese mismo curso
+    const cursoExistente = await Curso.findOne({
+      nombre,
+      nivel,
+      paralelo,
+      docente_id
+    });
+
+    if (cursoExistente) {
       return res.status(400).json({
-        error: `El docente ${docente.nombres} ${docente.apellidos} ya tiene asignado el curso ${cursoDocente.nombre} ${cursoDocente.paralelo}`
+        error: `El docente ${docente.nombres} ${docente.apellidos} ya tiene asignado el curso ${nombre} ${paralelo}`
       });
     }
 
-    // Verificar que el paralelo no se repita dentro del mismo nivel
-    const paraleloExistente = await Curso.findOne({ nivel, paralelo });
-    if (paraleloExistente) {
+    // Verificar que no exista otro curso con el mismo nombre/nivel/paralelo
+    // (independientemente del docente)
+    const duplicadoGeneral = await Curso.findOne({ nombre, nivel, paralelo });
+    if (duplicadoGeneral) {
       return res.status(400).json({
-        error: `Ya existe un curso con el paralelo ${paralelo} en el nivel ${nivel}`
+        error: `Ya existe un curso ${nombre} ${paralelo} en el nivel ${nivel}`
       });
     }
 
-    // Crear curso vacío con docente asignado
+    // Crear nuevo curso
     const nuevoCurso = new Curso({
       nombre,
       nivel,
@@ -61,6 +68,56 @@ const crearCurso = async (req, res) => {
   } catch (error) {
     console.error('Error al crear el curso:', error);
     res.status(500).json({ error: 'Error interno al crear el curso' });
+  }
+};
+
+// Obtener los cursos asignados a un docente
+const obtenerCursosPorDocente = async (req, res) => {
+  try {
+    await connectDB();
+
+    const { docente_id } = req.params;
+
+    // Validar que se envíe el ID
+    if (!docente_id) {
+      return res.status(400).json({ error: 'El ID del docente es obligatorio' });
+    }
+
+    // Verificar si el docente existe y tiene rol docente
+    const docente = await Usuario.findById(docente_id);
+    if (!docente) {
+      return res.status(404).json({ error: 'No se encontró el docente' });
+    }
+
+    if (docente.rol !== 'docente') {
+      return res.status(400).json({ error: 'El usuario no es un docente' });
+    }
+
+    // Buscar todos los cursos donde el docente esté asignado
+    const cursos = await Curso.find({ docente_id });
+
+    if (!cursos || cursos.length === 0) {
+      return res.status(200).json({
+        mensaje: `El docente ${docente.nombres} ${docente.apellidos} no tiene cursos asignados.`,
+        cursos: []
+      });
+    }
+
+    // Devolver información detallada
+    res.status(200).json({
+      mensaje: `Cursos asignados al docente ${docente.nombres} ${docente.apellidos}`,
+      total: cursos.length,
+      cursos: cursos.map(curso => ({
+        id: curso._id,
+        nombre: curso.nombre,
+        nivel: curso.nivel,
+        paralelo: curso.paralelo,
+        total_estudiantes: curso.estudiantes?.length || 0
+      }))
+    });
+  } catch (error) {
+    console.error('Error al obtener los cursos del docente:', error);
+    res.status(500).json({ error: 'Error interno al obtener los cursos' });
   }
 };
 
@@ -175,4 +232,4 @@ const finalizarPromediosCurso = async (req, res) => {
   }
 };
 
-module.exports = { crearCurso, finalizarPromediosCurso };
+module.exports = { crearCurso, finalizarPromediosCurso, obtenerCursosPorDocente };

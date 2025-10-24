@@ -71,7 +71,7 @@ const crearCurso = async (req, res) => {
   }
 };
 
-// Obtener los cursos asignados a un docente
+// Obtener los cursos asignados a un docente (incluye total_materias en la respuesta)
 const obtenerCursosPorDocente = async (req, res) => {
   try {
     await connectDB();
@@ -103,23 +103,38 @@ const obtenerCursosPorDocente = async (req, res) => {
       });
     }
 
-    // Devolver información detallada
+    // Contar materias por curso. OJO con el tipo de curso_id en Materia (puede ser string u ObjectId)
+    const cursosConMaterias = await Promise.all(
+      cursos.map(async (curso) => {
+        const idObj = curso._id;
+        const idStr = String(curso._id);
+
+        const totalMaterias = await Materia.countDocuments({
+          $or: [{ curso_id: idObj }, { curso_id: idStr }]
+        });
+
+        return {
+          id: curso._id,
+          nombre: curso.nombre,
+          nivel: curso.nivel,
+          paralelo: curso.paralelo,
+          total_estudiantes: Array.isArray(curso.estudiantes) ? curso.estudiantes.length : 0,
+          total_materias: totalMaterias
+        };
+      })
+    );
+
     res.status(200).json({
       mensaje: `Cursos asignados al docente ${docente.nombres} ${docente.apellidos}`,
-      total: cursos.length,
-      cursos: cursos.map(curso => ({
-        id: curso._id,
-        nombre: curso.nombre,
-        nivel: curso.nivel,
-        paralelo: curso.paralelo,
-        total_estudiantes: curso.estudiantes?.length || 0
-      }))
+      total: cursosConMaterias.length,
+      cursos: cursosConMaterias
     });
   } catch (error) {
     console.error('Error al obtener los cursos del docente:', error);
     res.status(500).json({ error: 'Error interno al obtener los cursos' });
   }
 };
+
 
 const finalizarPromediosCurso = async (req, res) => {
   try {

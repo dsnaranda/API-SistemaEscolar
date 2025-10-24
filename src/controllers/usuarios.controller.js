@@ -178,21 +178,46 @@ const addEstudiantesEnCursos = async (req, res) => {
     await connectDB();
     const { curso_id, estudiantes } = req.body;
 
-    // Validar datos
+    // 🔹 Validar datos
     if (!curso_id || !Array.isArray(estudiantes) || estudiantes.length === 0) {
-      return res.status(400).json({ error: 'Debe enviar un curso_id y un arreglo de estudiantes' });
+      return res
+        .status(400)
+        .json({ error: 'Debe enviar un curso_id y un arreglo de estudiantes' });
     }
 
-    // Verificar que el curso exista
+    // 🔹 Verificar que el curso exista
     const curso = await Curso.findById(curso_id);
     if (!curso) {
       return res.status(404).json({ error: 'Curso no encontrado' });
     }
 
-    // Procesar estudiantes
+    // 🔹 Obtener todas las cédulas y correos enviados
+    const ciList = estudiantes.map((e) => e.ci);
+    const emailList = estudiantes.map((e) => e.email);
+
+    // 🔹 Buscar duplicados existentes en la base de datos
+    const duplicados = await Usuario.find({
+      $or: [{ ci: { $in: ciList } }, { email: { $in: emailList } }],
+    });
+
+    if (duplicados.length > 0) {
+      const detalles = duplicados.map(
+        (d) => `• ${d.nombres} ${d.apellidos} (${d.email || d.ci})`
+      );
+
+      return res.status(400).json({
+        error:
+          `Algunos estudiantes ya están registrados:\n${detalles.join('\n')}`,
+      });
+    }
+
+    // 🔹 Procesar estudiantes (hash de contraseñas)
     const nuevosEstudiantes = estudiantes.map((est) => {
       const salt = crypto.randomBytes(16).toString('hex');
-      const hash = crypto.createHmac('sha256', salt).update(est.password).digest('hex');
+      const hash = crypto
+        .createHmac('sha256', salt)
+        .update(est.password)
+        .digest('hex');
       const passwordHash = `sha256$${salt}$${hash}`;
 
       return {
@@ -202,27 +227,28 @@ const addEstudiantesEnCursos = async (req, res) => {
         email: est.email,
         rol: 'estudiante',
         password: passwordHash,
-        curso_id
+        curso_id,
       };
     });
 
-    // Insertar todos
+    // 🔹 Insertar todos los nuevos
     const resultado = await Usuario.insertMany(nuevosEstudiantes);
 
     res.status(201).json({
       mensaje: `✅ ${resultado.length} estudiantes agregados correctamente al curso ${curso.nombre} ${curso.paralelo}`,
-      estudiantes: resultado.map(e => ({
+      estudiantes: resultado.map((e) => ({
         id: e._id,
         nombres: e.nombres,
         apellidos: e.apellidos,
         email: e.email,
-        ci: e.ci
-      }))
+        ci: e.ci,
+      })),
     });
   } catch (error) {
     console.error('Error al agregar estudiantes masivamente:', error);
     res.status(500).json({ error: 'Error al agregar estudiantes masivamente' });
   }
 };
+
 
 module.exports = { obtenerUsuarios, loginUsuario, obtenerEstudiantesPorCurso, crearProfesor, addEstudiantesEnCursos };

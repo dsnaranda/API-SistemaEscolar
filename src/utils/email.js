@@ -5,6 +5,8 @@ const userGmail = process.env.GMAIL_USER;
 const passAppGmail = process.env.GMAIL_PASS;
 //https://myaccount.google.com/apppasswords
 
+console.log("Usuario que envia el email:", userGmail); 
+
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {

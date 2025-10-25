@@ -262,4 +262,83 @@ const cerrarTrimestresPorMateria = async (req, res) => {
   }
 };
 
-module.exports = { crearTrimestresPorCurso, obtenerTrimestreDetallado, cerrarTrimestreIndividual, cerrarTrimestresPorMateria };
+const verificarTrimestresPorMateria = async (req, res) => {
+  try {
+    await connectDB();
+    const { materia_id } = req.params;
+
+    if (!materia_id) {
+      return res.status(400).json({ error: 'Debe enviar materia_id.' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(materia_id)) {
+      return res.status(400).json({ error: 'ID de materia inválido.' });
+    }
+
+    // Buscar la materia
+    const materia = await Materia.findById(materia_id).lean();
+    if (!materia) {
+      return res.status(404).json({ error: 'Materia no encontrada.' });
+    }
+
+    // Buscar curso asociado
+    const curso = await Curso.findById(materia.curso_id).lean();
+    if (!curso) {
+      return res.status(404).json({ error: 'Curso asociado no encontrado.' });
+    }
+
+    // Buscar todos los trimestres de esa materia
+    const trimestres = await Trimestre.find({ materia_id })
+      .select('_id numero estudiante_id estado')
+      .lean();
+
+    // Agrupar por número de trimestre
+    const grupo = {
+      1: trimestres.filter(t => t.numero === 1).map(t => t._id),
+      2: trimestres.filter(t => t.numero === 2).map(t => t._id),
+      3: trimestres.filter(t => t.numero === 3).map(t => t._id),
+    };
+
+    // Construir respuesta
+    const respuesta = {
+      curso: `${curso.nombre} ${curso.paralelo}`,
+      materia: materia.nombre,
+      descripcion: materia.descripcion,
+      trimestres: {
+        trimestre_1: grupo[1].length > 0
+          ? {
+              existe: true,
+              cantidad: grupo[1].length,
+              ids: grupo[1],
+              mensaje: 'Trimestre 1 ya creado para esta materia.'
+            }
+          : { existe: false, mensaje: 'Trimestre 1 aún no ha sido creado.' },
+        trimestre_2: grupo[2].length > 0
+          ? {
+              existe: true,
+              cantidad: grupo[2].length,
+              ids: grupo[2],
+              mensaje: 'Trimestre 2 ya creado para esta materia.'
+            }
+          : { existe: false, mensaje: 'Trimestre 2 aún no ha sido creado.' },
+        trimestre_3: grupo[3].length > 0
+          ? {
+              existe: true,
+              cantidad: grupo[3].length,
+              ids: grupo[3],
+              mensaje: 'Trimestre 3 ya creado para esta materia.'
+            }
+          : { existe: false, mensaje: 'Trimestre 3 aún no ha sido creado.' },
+      }
+    };
+
+    res.status(200).json(respuesta);
+
+  } catch (error) {
+    console.error('Error al verificar trimestres por materia:', error);
+    res.status(500).json({ error: 'Error interno al verificar trimestres por materia.' });
+  }
+};
+
+
+module.exports = { crearTrimestresPorCurso, obtenerTrimestreDetallado, cerrarTrimestreIndividual, cerrarTrimestresPorMateria, verificarTrimestresPorMateria };

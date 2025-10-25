@@ -6,5 +6,6 @@ router.post('/add', trimestreController.crearTrimestresPorCurso);
 router.get('/:id', trimestreController.obtenerTrimestreDetallado);
 router.put('/cerrar/:trimestre_id', trimestreController.cerrarTrimestreIndividual);
 router.put('/cerrar-materia', trimestreController.cerrarTrimestresPorMateria);
+router.get('/verificar/materia/:materia_id', trimestreController.verificarTrimestresPorMateria);
 
 module.exports = router;

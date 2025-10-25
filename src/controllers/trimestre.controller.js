@@ -294,10 +294,33 @@ const verificarTrimestresPorMateria = async (req, res) => {
 
     // Agrupar por número de trimestre
     const grupo = {
-      1: trimestres.filter(t => t.numero === 1).map(t => t._id),
-      2: trimestres.filter(t => t.numero === 2).map(t => t._id),
-      3: trimestres.filter(t => t.numero === 3).map(t => t._id),
+      1: trimestres.filter(t => t.numero === 1),
+      2: trimestres.filter(t => t.numero === 2),
+      3: trimestres.filter(t => t.numero === 3),
     };
+
+    // Función auxiliar: calcular estado general
+    const calcularEstado = (trimestresArr) => {
+      if (trimestresArr.length === 0) return null;
+
+      const abiertos = trimestresArr.filter(t => t.estado === 'abierto').length;
+      const cerrados = trimestresArr.filter(t => t.estado === 'cerrado').length;
+
+      if (abiertos > 0) {
+        return {
+          estado: 'abierto',
+          mensaje: 'Trimestre aún abierto. Existen usuarios sin calificaciones registradas.'
+        };
+      } else if (cerrados > 0 && abiertos === 0) {
+        return { estado: 'cerrado', mensaje: 'Trimestre cerrado correctamente.' };
+      }
+      return null;
+    };
+
+    // Calcular estado general de cada trimestre
+    const t1Estado = calcularEstado(grupo[1]);
+    const t2Estado = calcularEstado(grupo[2]);
+    const t3Estado = calcularEstado(grupo[3]);
 
     // Construir respuesta
     const respuesta = {
@@ -307,27 +330,32 @@ const verificarTrimestresPorMateria = async (req, res) => {
       trimestres: {
         trimestre_1: grupo[1].length > 0
           ? {
-              existe: true,
-              cantidad: grupo[1].length,
-              ids: grupo[1],
-              mensaje: 'Trimestre 1 ya creado para esta materia.'
-            }
+            existe: true,
+            cantidad: grupo[1].length,
+            ids: grupo[1].map(t => t._id),
+            estado: t1Estado?.estado,
+            mensaje: t1Estado?.mensaje
+          }
           : { existe: false, mensaje: 'Trimestre 1 aún no ha sido creado.' },
+
         trimestre_2: grupo[2].length > 0
           ? {
-              existe: true,
-              cantidad: grupo[2].length,
-              ids: grupo[2],
-              mensaje: 'Trimestre 2 ya creado para esta materia.'
-            }
+            existe: true,
+            cantidad: grupo[2].length,
+            ids: grupo[2].map(t => t._id),
+            estado: t2Estado?.estado,
+            mensaje: t2Estado?.mensaje
+          }
           : { existe: false, mensaje: 'Trimestre 2 aún no ha sido creado.' },
+
         trimestre_3: grupo[3].length > 0
           ? {
-              existe: true,
-              cantidad: grupo[3].length,
-              ids: grupo[3],
-              mensaje: 'Trimestre 3 ya creado para esta materia.'
-            }
+            existe: true,
+            cantidad: grupo[3].length,
+            ids: grupo[3].map(t => t._id),
+            estado: t3Estado?.estado,
+            mensaje: t3Estado?.mensaje
+          }
           : { existe: false, mensaje: 'Trimestre 3 aún no ha sido creado.' },
       }
     };
@@ -339,6 +367,5 @@ const verificarTrimestresPorMateria = async (req, res) => {
     res.status(500).json({ error: 'Error interno al verificar trimestres por materia.' });
   }
 };
-
 
 module.exports = { crearTrimestresPorCurso, obtenerTrimestreDetallado, cerrarTrimestreIndividual, cerrarTrimestresPorMateria, verificarTrimestresPorMateria };

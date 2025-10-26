@@ -369,12 +369,13 @@ const cambiarContrasena = async (req, res) => {
   }
 };
 
-// Editar un usuario existente (sin modificar id, rol ni contraseña)
 const editarUsuario = async (req, res) => {
   try {
     await connectDB();
     const { id } = req.params;
     const datos = req.body;
+
+    console.log('ID recibido en la edición:', id);
 
     // Verificar si el usuario existe
     const usuario = await Usuario.findById(id);
@@ -388,34 +389,27 @@ const editarUsuario = async (req, res) => {
     delete datos.rol;
     delete datos.password;
 
-    // Si no hay campos válidos para actualizar
     if (Object.keys(datos).length === 0) {
       return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
     }
 
-    // Validar duplicados de CI
-    if (datos.ci) {
-      const duplicadoCI = await Usuario.findOne({
-        ci: datos.ci,
-        _id: { $ne: id } // excluye al propio usuario
-      });
+    // Verificar duplicado de CI (solo si cambia)
+    if (datos.ci && datos.ci !== usuario.ci) {
+      const duplicadoCI = await Usuario.findOne({ ci: datos.ci, _id: { $ne: usuario._id } });
       if (duplicadoCI) {
         return res.status(400).json({ error: `Ya existe un usuario con la cédula ${datos.ci}` });
       }
     }
 
-    // Validar duplicados de Email
-    if (datos.email) {
-      const duplicadoEmail = await Usuario.findOne({
-        email: datos.email,
-        _id: { $ne: id } // excluye al propio usuario
-      });
+    // Verificar duplicado de email (solo si cambia)
+    if (datos.email && datos.email !== usuario.email) {
+      const duplicadoEmail = await Usuario.findOne({ email: datos.email, _id: { $ne: usuario._id } });
       if (duplicadoEmail) {
         return res.status(400).json({ error: `Ya existe un usuario con el correo ${datos.email}` });
       }
     }
 
-    // Actualizar campos permitidos
+    // Actualizar los campos permitidos
     Object.assign(usuario, datos);
     await usuario.save();
 
@@ -436,5 +430,6 @@ const editarUsuario = async (req, res) => {
     res.status(500).json({ error: 'Error interno al editar el usuario' });
   }
 };
+
 
 module.exports = { obtenerUsuarios, loginUsuario, obtenerEstudiantesPorCurso, crearProfesor, addEstudiantesEnCursos, verificarCorreo, cambiarContrasena, editarUsuario };

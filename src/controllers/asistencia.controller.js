@@ -241,21 +241,58 @@ const actualizarAsistenciaCurso = async (req, res) => {
 
     // Validaciones básicas
     if (!curso_id || !fecha || !Array.isArray(estudiantes) || estudiantes.length === 0) {
-      return res.status(400).json({ error: 'Debe enviar curso_id, fecha y una lista de estudiantes con su nuevo estado.' });
+      return res.status(400).json({
+        error: 'Debe enviar curso_id, fecha y una lista de estudiantes con su nuevo estado.'
+      });
     }
 
     if (!mongoose.Types.ObjectId.isValid(curso_id)) {
       return res.status(400).json({ error: 'ID de curso inválido.' });
     }
 
-    // Normalización de fecha (manteniendo formato YYYY-MM-DD)
     const fechaNormalizada = fecha.trim();
 
-    // Verificar curso
+    // Verificar que el curso exista
     const curso = await Curso.findById(curso_id).select('nombre paralelo').lean();
-    if (!curso) return res.status(404).json({ error: 'Curso no encontrado.' });
+    if (!curso) {
+      return res.status(404).json({ error: 'Curso no encontrado.' });
+    }
 
-    // Crear operaciones bulk
+    // Buscar asistencias existentes para ese curso y fecha
+    const existentes = await Asistencia.find({
+      curso_id: new mongoose.Types.ObjectId(curso_id),
+      fecha: fechaNormalizada
+    }).lean();
+
+    if (existentes.length === 0) {
+      return res.status(400).json({
+        error: `No existen registros de asistencia para ${curso.nombre} ${curso.paralelo} en la fecha ${fechaNormalizada}.`
+      });
+    }
+
+    // Crear mapa estudiante_id → estado actual
+    const estadoActual = new Map(
+      existentes.map(e => [e.estudiante_id.toString(), e.estado])
+    );
+
+    // Validar que no se intente justificar a presentes
+    const invalidos = estudiantes.filter(
+      e =>
+        e.estado === 'Justificado' &&
+        estadoActual.get(e.id) === 'Presente'
+    );
+
+    if (invalidos.length > 0) {
+      const nombres = invalidos
+        .map(e => `• ${e.id}`)
+        .join('\n');
+      return res.status(400).json({
+        error: `No se puede justificar a estudiantes que ya están marcados como "Presente".`,
+        detalle: nombres
+      });
+    }
+
+    // Crear operaciones válidas
     const operaciones = estudiantes.map(est => ({
       updateOne: {
         filter: {
@@ -264,33 +301,26 @@ const actualizarAsistenciaCurso = async (req, res) => {
           fecha: fechaNormalizada
         },
         update: { $set: { estado: est.estado } },
-        upsert: false // Solo actualiza registros existentes, no crea nuevos
+        upsert: false 
       }
     }));
 
     const resultado = await Asistencia.bulkWrite(operaciones);
 
-    // Contar estados para resumen
+    // Resumen de cambios
     const total_actualizados = resultado.modifiedCount;
-    const ids = estudiantes.map(e => new mongoose.Types.ObjectId(e.id));
-    const registrosActualizados = await Asistencia.find({
-      curso_id: curso_id,
-      fecha: fechaNormalizada,
-      estudiante_id: { $in: ids }
-    }).select('estudiante_id estado').lean();
 
-    // Preparar respuesta
     res.status(200).json({
       mensaje: `Asistencia actualizada para ${curso.nombre} ${curso.paralelo}`,
       fecha: fechaNormalizada,
-      total_estudiantes_afectados: estudiantes.length,
       total_actualizados,
-      detalles: registrosActualizados
+      total_estudiantes_afectados: estudiantes.length
     });
   } catch (error) {
     console.error('Error al actualizar asistencia:', error);
     res.status(500).json({ error: 'Error interno al actualizar asistencia.' });
   }
 };
+
 
 module.exports = { obtenerAsistenciaCurso, registrarAsistenciaCurso, actualizarAsistenciaCurso };

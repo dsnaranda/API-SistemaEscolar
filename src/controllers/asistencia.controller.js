@@ -30,7 +30,10 @@ const obtenerAsistenciaCurso = async (req, res) => {
     });
 
     // 1) Curso
-    const curso = await Curso.findById(cursoObjectId).select('nombre').lean();
+    const curso = await Curso.findById(cursoObjectId)
+      .select('nombre nivel paralelo')
+      .lean();
+
     // 2) Estudiantes del curso
     const estudiantes = await Usuario.find({ curso_id: cursoObjectId })
       .select('nombres apellidos')

@@ -5,5 +5,6 @@ const cursoController = require('../controllers/cursos.controller');
 router.post('/add', cursoController.crearCurso);
 router.put('/finalizar-promedios', cursoController.finalizarPromediosCurso);
 router.get('/docente/:docente_id', cursoController.obtenerCursosPorDocente);
+router.get('/estudiante/:estudiante_id', cursoController.obtenerCursosPorEstudiante);
 
 module.exports = router;

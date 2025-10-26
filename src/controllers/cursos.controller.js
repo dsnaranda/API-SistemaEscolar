@@ -247,4 +247,72 @@ const finalizarPromediosCurso = async (req, res) => {
   }
 };
 
-module.exports = { crearCurso, finalizarPromediosCurso, obtenerCursosPorDocente };
+// Obtener los cursos donde un estudiante está matriculado
+const obtenerCursosPorEstudiante = async (req, res) => {
+  try {
+    await connectDB();
+    const { estudiante_id } = req.params;
+
+    if (!estudiante_id) {
+      return res.status(400).json({ error: 'El ID del estudiante es obligatorio.' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(estudiante_id)) {
+      return res.status(400).json({ error: 'ID de estudiante inválido.' });
+    }
+
+    // Buscar el estudiante y validar rol
+    const estudiante = await Usuario.findById(estudiante_id).lean();
+    if (!estudiante) {
+      return res.status(404).json({ error: 'Estudiante no encontrado.' });
+    }
+
+    if (estudiante.rol !== 'estudiante') {
+      return res.status(400).json({ error: 'El usuario no tiene rol de estudiante.' });
+    }
+
+    // Buscar todos los cursos donde figure en la lista de estudiantes
+    const cursos = await Curso.find({ estudiantes: estudiante_id })
+      .populate('docente_id', 'nombres apellidos correo')
+      .lean();
+
+    if (cursos.length === 0) {
+      return res.status(200).json({
+        mensaje: `${estudiante.nombres} ${estudiante.apellidos} no está matriculado en ningún curso.`,
+        cursos: []
+      });
+    }
+
+    // Para cada curso, contar materias
+    const cursosDetalle = await Promise.all(
+      cursos.map(async (curso) => {
+        const totalMaterias = await Materia.countDocuments({
+          $or: [{ curso_id: curso._id }, { curso_id: String(curso._id) }]
+        });
+
+        return {
+          id: curso._id,
+          nombre: curso.nombre,
+          nivel: curso.nivel,
+          paralelo: curso.paralelo,
+          total_materias: totalMaterias,
+          total_estudiantes: curso.estudiantes?.length || 0,
+          docente: curso.docente_id
+            ? `${curso.docente_id.nombres} ${curso.docente_id.apellidos}`
+            : 'Sin docente asignado'
+        };
+      })
+    );
+
+    res.status(200).json({
+      mensaje: `Cursos donde está matriculado ${estudiante.nombres} ${estudiante.apellidos}`,
+      total: cursosDetalle.length,
+      cursos: cursosDetalle
+    });
+  } catch (error) {
+    console.error('Error al obtener cursos del estudiante:', error);
+    res.status(500).json({ error: 'Error interno al obtener cursos del estudiante.' });
+  }
+};
+
+module.exports = { crearCurso, finalizarPromediosCurso, obtenerCursosPorDocente, obtenerCursosPorEstudiante };

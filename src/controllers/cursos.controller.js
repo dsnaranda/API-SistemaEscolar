@@ -315,4 +315,49 @@ const obtenerCursosPorEstudiante = async (req, res) => {
   }
 };
 
-module.exports = { crearCurso, finalizarPromediosCurso, obtenerCursosPorDocente, obtenerCursosPorEstudiante };
+const obtenerTodosLosCursos = async (req, res) => {
+  try {
+    await connectDB();
+
+    const cursos = await Curso.find().populate('docente_id', 'nombres apellidos').lean();
+
+    if (!cursos || cursos.length === 0) {
+      return res.status(200).json({
+        mensaje: 'No hay cursos registrados actualmente.',
+        cursos: []
+      });
+    }
+
+    const cursosDetalle = await Promise.all(
+      cursos.map(async (curso) => {
+        const totalMaterias = await Materia.countDocuments({
+          $or: [{ curso_id: curso._id }, { curso_id: String(curso._id) }]
+        });
+
+        return {
+          id: curso._id,
+          nombre: curso.nombre,
+          nivel: curso.nivel,
+          paralelo: curso.paralelo,
+          total_estudiantes: curso.estudiantes?.length || 0,
+          total_materias: totalMaterias,
+          docente: curso.docente_id
+            ? `${curso.docente_id.nombres} ${curso.docente_id.apellidos}`
+            : 'Sin docente'
+        };
+      })
+    );
+
+    res.status(200).json({
+      mensaje: 'Lista completa de cursos registrados.',
+      total: cursosDetalle.length,
+      cursos: cursosDetalle
+    });
+  } catch (error) {
+    console.error('Error al obtener todos los cursos:', error);
+    res.status(500).json({ error: 'Error interno al obtener todos los cursos.' });
+  }
+};
+
+
+module.exports = { crearCurso, finalizarPromediosCurso, obtenerCursosPorDocente, obtenerCursosPorEstudiante, obtenerTodosLosCursos  };

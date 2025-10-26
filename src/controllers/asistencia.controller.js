@@ -221,7 +221,7 @@ const registrarAsistenciaCurso = async (req, res) => {
 
     // 🔹 Respuesta final
     res.status(200).json({
-      mensaje: `Asistencia registrada (sin duplicar) para ${curso.nombre} ${curso.paralelo}`,
+      mensaje: `Asistencia registrada para ${curso.nombre} ${curso.paralelo}`,
       fecha: fechaNormalizada,
       total_insertados: nuevosRegistros.length,
       total_presentes,

@@ -76,13 +76,16 @@ const obtenerAsistenciaCurso = async (req, res) => {
     // Respuesta
     res.json({
       curso_id: cursoId,
-      curso_nombre: curso ? curso.nombre : 'Curso desconocido',
+      curso: curso ? curso.nombre : 'Curso desconocido',
+      nivel: curso?.nivel || '',
+      paralelo: curso?.paralelo || '',
       fecha: fechaNormalizada,
       total_estudiantes: estudiantes.length,
       total_presentes,
       total_ausentes,
       estudiantes: estudiantesConEstado
     });
+
   } catch (error) {
     console.error('Error al obtener asistencia:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -301,7 +304,7 @@ const actualizarAsistenciaCurso = async (req, res) => {
           fecha: fechaNormalizada
         },
         update: { $set: { estado: est.estado } },
-        upsert: false 
+        upsert: false
       }
     }));
 

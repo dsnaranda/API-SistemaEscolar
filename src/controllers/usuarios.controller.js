@@ -393,9 +393,30 @@ const editarUsuario = async (req, res) => {
       return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
     }
 
-    // Actualizar los campos válidos
-    Object.assign(usuario, datos);
+    // Validar duplicados de CI
+    if (datos.ci) {
+      const duplicadoCI = await Usuario.findOne({
+        ci: datos.ci,
+        _id: { $ne: id } // excluye al propio usuario
+      });
+      if (duplicadoCI) {
+        return res.status(400).json({ error: `Ya existe un usuario con la cédula ${datos.ci}` });
+      }
+    }
 
+    // Validar duplicados de Email
+    if (datos.email) {
+      const duplicadoEmail = await Usuario.findOne({
+        email: datos.email,
+        _id: { $ne: id } // excluye al propio usuario
+      });
+      if (duplicadoEmail) {
+        return res.status(400).json({ error: `Ya existe un usuario con el correo ${datos.email}` });
+      }
+    }
+
+    // Actualizar campos permitidos
+    Object.assign(usuario, datos);
     await usuario.save();
 
     res.status(200).json({
@@ -407,7 +428,7 @@ const editarUsuario = async (req, res) => {
         ci: usuario.ci,
         email: usuario.email,
         curso_id: usuario.curso_id,
-        rol: usuario.rol, // solo lectura
+        rol: usuario.rol,
       },
     });
   } catch (error) {
@@ -415,6 +436,5 @@ const editarUsuario = async (req, res) => {
     res.status(500).json({ error: 'Error interno al editar el usuario' });
   }
 };
-
 
 module.exports = { obtenerUsuarios, loginUsuario, obtenerEstudiantesPorCurso, crearProfesor, addEstudiantesEnCursos, verificarCorreo, cambiarContrasena, editarUsuario };

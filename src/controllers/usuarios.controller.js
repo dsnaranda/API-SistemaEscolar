@@ -369,4 +369,52 @@ const cambiarContrasena = async (req, res) => {
   }
 };
 
-module.exports = { obtenerUsuarios, loginUsuario, obtenerEstudiantesPorCurso, crearProfesor, addEstudiantesEnCursos, verificarCorreo, cambiarContrasena };
+// Editar un usuario existente (sin modificar id, rol ni contraseña)
+const editarUsuario = async (req, res) => {
+  try {
+    await connectDB();
+    const { id } = req.params;
+    const datos = req.body;
+
+    // Verificar si el usuario existe
+    const usuario = await Usuario.findById(id);
+    if (!usuario) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Eliminar campos no modificables
+    delete datos._id;
+    delete datos.id;
+    delete datos.rol;
+    delete datos.password;
+
+    // Si no hay campos válidos para actualizar
+    if (Object.keys(datos).length === 0) {
+      return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
+    }
+
+    // Actualizar los campos válidos
+    Object.assign(usuario, datos);
+
+    await usuario.save();
+
+    res.status(200).json({
+      mensaje: 'Usuario actualizado correctamente',
+      usuario: {
+        id: usuario._id,
+        nombres: usuario.nombres,
+        apellidos: usuario.apellidos,
+        ci: usuario.ci,
+        email: usuario.email,
+        curso_id: usuario.curso_id,
+        rol: usuario.rol, // solo lectura
+      },
+    });
+  } catch (error) {
+    console.error('Error al editar el usuario:', error);
+    res.status(500).json({ error: 'Error interno al editar el usuario' });
+  }
+};
+
+
+module.exports = { obtenerUsuarios, loginUsuario, obtenerEstudiantesPorCurso, crearProfesor, addEstudiantesEnCursos, verificarCorreo, cambiarContrasena, editarUsuario };

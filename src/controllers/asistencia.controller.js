@@ -103,15 +103,18 @@ const registrarAsistenciaCurso = async (req, res) => {
       return res.status(400).json({ error: 'ID de curso inválido.' });
     }
 
-    // Fecha por defecto si no se envía
-    if (!fecha) {
+    // ✅ Normalización de la fecha
+    // Si el frontend la envía, la usamos directamente.
+    // Si no, se usa la actual. En ambos casos, formato YYYY-MM-DD.
+    let fechaNormalizada;
+    if (fecha && typeof fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fecha.trim())) {
+      fechaNormalizada = fecha.trim(); // usar tal cual (sin alterar)
+    } else {
       const hoy = new Date();
       const yyyy = hoy.getFullYear();
       const mm = String(hoy.getMonth() + 1).padStart(2, '0');
       const dd = String(hoy.getDate()).padStart(2, '0');
-      fecha = `${yyyy}-${mm}-${dd}`;
-    } else {
-      fecha = fecha.trim();
+      fechaNormalizada = `${yyyy}-${mm}-${dd}`;
     }
 
     // Verificar que el curso exista
@@ -133,7 +136,7 @@ const registrarAsistenciaCurso = async (req, res) => {
         filter: {
           curso_id: curso_id,
           estudiante_id: new mongoose.Types.ObjectId(est.id),
-          fecha: fecha
+          fecha: fechaNormalizada
         },
         update: { $set: { estado: est.estado } },
         upsert: true
@@ -159,7 +162,7 @@ const registrarAsistenciaCurso = async (req, res) => {
 
         const asunto = `Notificación de Inasistencia - ${curso.nombre} ${curso.paralelo}`;
         const mensaje = `
-            <div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f5f7fa; padding: 30px;">
+          <div style="font-family: 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f5f7fa; padding: 30px;">
             <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; box-shadow: 0 3px 8px rgba(0,0,0,0.05); overflow: hidden;">
               <div style=" background: linear-gradient(90deg, #007bff, #0056b3); color: white; padding: 15px 25px; font-size: 18px; font-weight: bold; text-align: center; letter-spacing: 0.5px;">
                 Notificación de Inasistencia
@@ -168,7 +171,7 @@ const registrarAsistenciaCurso = async (req, res) => {
                 <p>Estimado/a <strong>${user.nombres} ${user.apellidos}</strong>,</p>
                 <p>
                   Se ha registrado una <strong>inasistencia</strong> el día 
-                  <strong>${fecha}</strong> en el curso 
+                  <strong>${fechaNormalizada}</strong> en el curso 
                   <strong>${curso.nombre} ${curso.paralelo}</strong>.
                 </p>
                 <p>
@@ -186,7 +189,7 @@ const registrarAsistenciaCurso = async (req, res) => {
               </div>
             </div>
           </div>
-          `;
+        `;
 
         console.log(`Intentando enviar correo a: ${user.email} ...`);
         try {
@@ -208,7 +211,7 @@ const registrarAsistenciaCurso = async (req, res) => {
     // Respuesta final
     res.status(200).json({
       mensaje: `Asistencia registrada para el curso ${curso.nombre} ${curso.paralelo}`,
-      fecha,
+      fecha: fechaNormalizada,
       total_estudiantes: estudiantes.length,
       total_presentes,
       total_ausentes,

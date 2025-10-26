@@ -202,13 +202,24 @@ const addEstudiantesEnCursos = async (req, res) => {
     });
 
     if (duplicados.length > 0) {
-      const detalles = duplicados.map(
-        (d) => `• ${d.nombres} ${d.apellidos} (${d.email || d.ci})`
-      );
+      const ciSet = new Set(ciList);
+      const emailSet = new Set(emailList);
+
+      const detalles = duplicados.map((d) => {
+        const choques = [];
+        if (d.ci && ciSet.has(d.ci)) choques.push(`CI: ${d.ci}`);
+        if (d.email && emailSet.has(d.email)) choques.push(`Email: ${d.email}`);
+
+        // Si por alguna razón no se pudo determinar (edge cases), muestra ambos si existen
+        const info = choques.length > 0
+          ? choques.join(' y ')
+          : `CI: ${d.ci || '—'}${d.email ? `, Email: ${d.email}` : ''}`;
+
+        return `• ${d.nombres} ${d.apellidos} (${info})`;
+      });
 
       return res.status(400).json({
-        error:
-          `Algunos estudiantes ya están registrados:\n${detalles.join('\n')}`,
+        error: `Algunos estudiantes ya están registrados:\n${detalles.join('\n')}`,
       });
     }
 
@@ -232,7 +243,7 @@ const addEstudiantesEnCursos = async (req, res) => {
       };
     });
 
-    // 🔹 Insertar todos los nuevos
+    // Insertar todos los nuevos
     const resultado = await Usuario.insertMany(nuevosEstudiantes);
 
     res.status(201).json({

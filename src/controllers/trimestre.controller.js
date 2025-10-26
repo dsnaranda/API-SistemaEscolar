@@ -368,4 +368,112 @@ const verificarTrimestresPorMateria = async (req, res) => {
   }
 };
 
-module.exports = { crearTrimestresPorCurso, obtenerTrimestreDetallado, cerrarTrimestreIndividual, cerrarTrimestresPorMateria, verificarTrimestresPorMateria };
+// Crear los 3 trimestres (1, 2 y 3) para una materia específica
+// Si ya existen, solo crea los que faltan (para nuevos estudiantes)
+const crearTrimestresPorMateria = async (req, res) => {
+  try {
+    await connectDB();
+    const { materia_id } = req.body;
+
+    if (!materia_id) {
+      return res.status(400).json({ error: 'Debe enviar materia_id.' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(materia_id)) {
+      return res.status(400).json({ error: 'ID de materia inválido.' });
+    }
+
+    // Buscar la materia
+    const materia = await Materia.findById(materia_id).lean();
+    if (!materia) {
+      return res.status(404).json({ error: 'Materia no encontrada.' });
+    }
+
+    // Buscar el curso asociado y sus estudiantes
+    const curso = await Curso.findById(materia.curso_id).populate('estudiantes');
+    if (!curso) {
+      return res.status(404).json({ error: 'Curso asociado no encontrado.' });
+    }
+
+    if (curso.estudiantes.length === 0) {
+      return res.status(400).json({ error: 'No hay estudiantes en el curso.' });
+    }
+
+    // Parámetros base
+    const parametrosBase = [
+      { nombre: 'Lecciones', porcentaje: 20, actividades: [], promedio_parametro: null },
+      { nombre: 'Actividad intraclases', porcentaje: 20, actividades: [], promedio_parametro: null },
+      { nombre: 'Tareas', porcentaje: 10, actividades: [], promedio_parametro: null },
+      { nombre: 'Exposiciones', porcentaje: 10, actividades: [], promedio_parametro: null },
+      { nombre: 'Talleres', porcentaje: 10, actividades: [], promedio_parametro: null },
+      { nombre: 'Evaluación del periodo', porcentaje: 15, actividades: [], promedio_parametro: null },
+      { nombre: 'Proyecto interdisciplinar', porcentaje: 15, actividades: [], promedio_parametro: null }
+    ];
+
+    const nuevosTrimestres = [];
+    const yaExistentes = [];
+
+    // Crear trimestres 1, 2 y 3 para cada estudiante
+    for (const estudiante of curso.estudiantes) {
+      let nuevosPorEstudiante = 0;
+
+      for (let numero = 1; numero <= 3; numero++) {
+        // Verificar si ya existe ese trimestre
+        const existente = await Trimestre.findOne({
+          materia_id: materia._id,
+          estudiante_id: estudiante._id,
+          numero
+        });
+
+        if (existente) {
+          yaExistentes.push({
+            estudiante: `${estudiante.nombres} ${estudiante.apellidos}`,
+            trimestre: numero
+          });
+          continue;
+        }
+
+        // Crear nuevo trimestre para este estudiante
+        const parametrosCopia = JSON.parse(JSON.stringify(parametrosBase));
+
+        nuevosTrimestres.push({
+          numero,
+          materia_id: materia._id,
+          parametros: parametrosCopia,
+          promedio_trimestre: null,
+          estado: 'abierto',
+          estudiante_id: estudiante._id
+        });
+
+        nuevosPorEstudiante++;
+      }
+
+      if (nuevosPorEstudiante > 0) {
+        console.log(`Se crearán ${nuevosPorEstudiante} trimestres para ${estudiante.nombres} ${estudiante.apellidos}`);
+      }
+    }
+
+    if (nuevosTrimestres.length === 0) {
+      return res.status(200).json({
+        mensaje: 'No se crearon trimestres nuevos. Todos los estudiantes ya tienen los 3 trimestres.',
+        total_existentes: yaExistentes.length
+      });
+    }
+
+    // Insertar en bloque solo los nuevos
+    const resultado = await Trimestre.insertMany(nuevosTrimestres);
+
+    res.status(201).json({
+      mensaje: `Trimestres creados correctamente para nuevos estudiantes en la materia ${materia.nombre}.`,
+      total_estudiantes: curso.estudiantes.length,
+      nuevos_trimestres: resultado.length,
+      ya_existentes: yaExistentes.length,
+      detalles_existentes: yaExistentes
+    });
+  } catch (error) {
+    console.error('Error al crear trimestres por materia:', error);
+    res.status(500).json({ error: 'Error al crear trimestres por materia.' });
+  }
+};
+
+module.exports = { crearTrimestresPorCurso, obtenerTrimestreDetallado, cerrarTrimestreIndividual, cerrarTrimestresPorMateria, verificarTrimestresPorMateria, crearTrimestresPorMateria };

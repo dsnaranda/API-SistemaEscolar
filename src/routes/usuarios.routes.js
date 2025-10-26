@@ -9,6 +9,6 @@ router.post('/addprofesores', usuarioController.crearProfesor);
 router.post('/addestudiantes', usuarioController.addEstudiantesEnCursos);
 router.post('/verificar-correo', usuarioController.verificarCorreo);
 router.put('/cambiar-contrasena/:id', usuarioController.cambiarContrasena);
-router.put('/usuarios/:id', usuarioController.editarUsuario);
+router.put('/:id', usuarioController.editarUsuario);
 
 module.exports = router;

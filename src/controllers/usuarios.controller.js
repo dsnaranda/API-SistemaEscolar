@@ -271,7 +271,7 @@ const verificarCorreo = async (req, res) => {
     }
 
     // URL del frontend 
-    const frontendUrl = `http://localhost:4200/changepassword/${usuario._id}`;
+    const frontendUrl = `https://sistema-educa-frontend.vercel.app/changepassword/${usuario._id}`;
 
     // Cuerpo del mensaje HTML
     const mensajeHTML = `

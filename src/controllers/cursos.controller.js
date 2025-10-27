@@ -296,7 +296,7 @@ const finalizarPromediosCurso = async (req, res) => {
 
 const getCartillaNotas = async (req, res) => {
   try {
-    await connectDB(); // ✅ conexión asegurada antes de cualquier consulta
+    await connectDB();
 
     const { id } = req.params;
     const curso = await Curso.findById(id).lean();
@@ -313,25 +313,56 @@ const getCartillaNotas = async (req, res) => {
       });
     }
 
+    // 🔹 Buscar los estudiantes
     const idsEstudiantes = curso.notas_finales.map(n => n.estudiante_id);
     const estudiantes = await Usuario.find({ _id: { $in: idsEstudiantes } })
       .select('_id nombres apellidos')
       .lean();
 
+    // 🔹 Buscar todos los trimestres de esos estudiantes y sus materias
+    const trimestres = await Trimestre.find({
+      estudiante_id: { $in: idsEstudiantes }
+    })
+      .select('_id numero promedio_trimestre materia_id estudiante_id')
+      .lean();
+
+    // 🔹 Construir cartilla
     const cartilla = curso.notas_finales.map(nota => {
-      const estudiante = estudiantes.find(e => e._id.toString() === nota.estudiante_id.toString());
+      const estudiante = estudiantes.find(
+        e => e._id.toString() === nota.estudiante_id.toString()
+      );
+
+      // 🔹 Añadir detalle de materias con sus trimestres
+      const detalle_materias = nota.detalle_materias.map(m => {
+        const trimestresMateria = trimestres
+          .filter(
+            t =>
+              t.materia_id.toString() === m.materia_id.toString() &&
+              t.estudiante_id.toString() === nota.estudiante_id.toString()
+          )
+          .map(t => ({
+            trimestre_id: t._id,
+            numero: t.numero,
+            promedio_trimestre: t.promedio_trimestre
+          }))
+          .sort((a, b) => a.numero - b.numero);
+
+        return {
+          materia_id: m.materia_id,
+          materia_nombre: m.materia_nombre,
+          promedio_materia: m.promedio_materia,
+          trimestres: trimestresMateria
+        };
+      });
+
       return {
         estudiante_id: nota.estudiante_id,
         nombre_estudiante: estudiante
-          ? `${estudiante.nombres} ${estudiante.apellidos}`
+          ? `${estudiante.apellidos} ${estudiante.nombres}`
           : 'Desconocido',
         promedio_curso: nota.promedio_curso,
         estado: nota.estado,
-        detalle_materias: nota.detalle_materias.map(m => ({
-          materia_id: m.materia_id,
-          materia_nombre: m.materia_nombre,
-          promedio_materia: m.promedio_materia
-        }))
+        detalle_materias
       };
     });
 
@@ -341,9 +372,8 @@ const getCartillaNotas = async (req, res) => {
       total_estudiantes: cartilla.length,
       cartilla
     });
-
   } catch (error) {
-    console.error('Error al obtener cartilla de notas:', error);
+    console.error('❌ Error al obtener cartilla de notas:', error);
     return res.status(500).json({
       mensaje: 'Error al obtener cartilla final del curso.',
       error: error.message

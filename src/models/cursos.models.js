@@ -10,7 +10,14 @@ const CursoSchema = new mongoose.Schema({
     {
       estudiante_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario', required: true },
       promedio_curso: { type: Number, required: true },
-      estado: { type: String, enum: ['Aprobado', 'Reprobado'], required: true }
+      estado: { type: String, enum: ['Aprobado', 'Reprobado'], required: true },
+      detalle_materias: [
+        {
+          materia_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Materia', required: true },
+          materia_nombre: { type: String, required: true },
+          promedio_materia: { type: Number, required: true }
+        }
+      ]
     }
   ]
 }, {

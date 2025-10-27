@@ -1,6 +1,7 @@
 const Curso = require('../models/cursos.models');
 const Usuario = require('../models/usuarios.models');
 const Materia = require('../models/materias.models');
+const Trimestre = require('../models/trimestres.models');
 const mongoose = require('mongoose');
 const connectDB = require('../config/db');
 
@@ -135,7 +136,6 @@ const obtenerCursosPorDocente = async (req, res) => {
   }
 };
 
-
 const finalizarPromediosCurso = async (req, res) => {
   try {
     await connectDB();
@@ -149,19 +149,28 @@ const finalizarPromediosCurso = async (req, res) => {
       return res.status(400).json({ error: 'ID de curso inválido.' });
     }
 
-    // Buscar curso
-    const curso = await Curso.findById(curso_id);
+    // 🔹 Buscar curso
+    const curso = await Curso.findById(curso_id).lean();
     if (!curso) {
       return res.status(404).json({ error: 'Curso no encontrado.' });
     }
 
-    // Buscar materias del curso
+    // 🔹 Buscar materias del curso
     const materias = await Materia.find({ curso_id }).lean();
     if (materias.length === 0) {
       return res.status(400).json({ error: 'El curso no tiene materias registradas.' });
     }
 
-    // Determinar estudiantes a procesar
+    // 🔹 Buscar trimestres de todas las materias del curso
+    const materiaIds = materias.map(m => m._id.toString());
+    const Trimestre = require('../models/trimestres.models');
+    const trimestres = await Trimestre.find({ materia_id: { $in: materiaIds } }).lean();
+
+    if (trimestres.length === 0) {
+      return res.status(400).json({ error: 'No se encontraron trimestres para las materias del curso.' });
+    }
+
+    // 🔹 Estudiantes a procesar
     const estudiantesProcesar = estudiante_id
       ? [estudiante_id]
       : curso.estudiantes.map(e => e.toString());
@@ -170,45 +179,78 @@ const finalizarPromediosCurso = async (req, res) => {
     const pendientes = [];
     const yaGuardados = [];
 
+    console.log('📘 Procesando curso:', curso.nombre);
+    console.log('🔹 Estudiantes en curso:', estudiantesProcesar.length);
+    console.log('🔹 Materias encontradas:', materias.length);
+    console.log('🔹 Trimestres encontrados:', trimestres.length);
+
+    // =======================================================
     for (const estId of estudiantesProcesar) {
-      let todasMateriasCompletas = true;
-      const promediosEstudiante = [];
+      // Obtener trimestres del estudiante
+      const trimestresEst = trimestres.filter(
+        t => t.estudiante_id?.toString() === estId.toString()
+      );
 
-      // Revisar las materias de ese estudiante
-      for (const materia of materias) {
-        const registro = materia.promedios_estudiantes?.find(
-          e => e.estudiante_id.toString() === estId
-        );
-
-        if (!registro || registro.promedio_final == null) {
-          todasMateriasCompletas = false;
-          break;
-        }
-
-        promediosEstudiante.push(registro.promedio_final);
-      }
-
-      if (!todasMateriasCompletas) {
+      if (trimestresEst.length < 3) {
         pendientes.push(estId);
         continue;
       }
 
-      const promedio = promediosEstudiante.reduce((a, b) => a + b, 0) / promediosEstudiante.length;
-      const promedioFinal = Number(promedio.toFixed(2));
+      // Agrupar por materia
+      const materiasPorEst = {};
+      for (const t of trimestresEst) {
+        const materiaId = t.materia_id?.toString();
+        if (!materiasPorEst[materiaId]) materiasPorEst[materiaId] = [];
+        materiasPorEst[materiaId].push(t);
+      }
+
+      const promediosMaterias = [];
+
+      // Calcular promedio de cada materia
+      for (const materiaId in materiasPorEst) {
+        const trimestresMat = materiasPorEst[materiaId];
+
+        const cerrados = trimestresMat.filter(t => t.estado === 'cerrado');
+        if (cerrados.length < 3) {
+          console.log(`⚠️ Estudiante ${estId} tiene trimestres sin cerrar en materia ${materiaId}`);
+          continue;
+        }
+
+        const promedioMateria = cerrados.reduce(
+          (acc, t) => acc + (t.promedio_trimestre || 0),
+          0
+        ) / cerrados.length;
+
+        // Buscar nombre de la materia
+        const nombreMateria = materias.find(m => m._id.toString() === materiaId)?.nombre || 'Materia desconocida';
+
+        promediosMaterias.push({
+          materia_id: materiaId,
+          materia_nombre: nombreMateria,
+          promedio_materia: Number(promedioMateria.toFixed(2))
+        });
+      }
+
+      if (promediosMaterias.length === 0) {
+        pendientes.push(estId);
+        continue;
+      }
+
+      // Promedio del curso = promedio de los promedios de materia
+      const sumaTotal = promediosMaterias.reduce((a, m) => a + m.promedio_materia, 0);
+      const promedioFinal = Number((sumaTotal / promediosMaterias.length).toFixed(2));
       const estado = promedioFinal >= 7 ? 'Aprobado' : 'Reprobado';
 
-      // Revisar si ya está en notas_finales
-      const cursoActual = await Curso.findById(curso_id).lean();
-      const yaExiste = cursoActual.notas_finales?.some(
-        nf => nf.estudiante_id.toString() === estId
+      // Verificar duplicado
+      const yaExiste = curso.notas_finales?.some(
+        nf => nf.estudiante_id.toString() === estId.toString()
       );
-
       if (yaExiste) {
         yaGuardados.push(estId);
         continue;
       }
 
-      // Guardar resultado en notas_finales (sin duplicar)
+      // Guardar resultado completo
       await Curso.updateOne(
         { _id: curso_id },
         {
@@ -216,19 +258,24 @@ const finalizarPromediosCurso = async (req, res) => {
             notas_finales: {
               estudiante_id: new mongoose.Types.ObjectId(estId),
               promedio_curso: promedioFinal,
-              estado
+              estado,
+              detalle_materias: promediosMaterias
             }
           }
         }
       );
 
+      console.log(`✅ Estudiante ${estId} - promedio final: ${promedioFinal} (${estado})`);
+
       resultados.push({
         estudiante_id: estId,
         promedio_curso: promedioFinal,
-        estado
+        estado,
+        detalle_materias: promediosMaterias
       });
     }
 
+    // =======================================================
     res.status(200).json({
       mensaje: 'Promedios del curso calculados correctamente.',
       curso_id,
@@ -242,10 +289,12 @@ const finalizarPromediosCurso = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error al finalizar promedios del curso:', error);
+    console.error('❌ Error al finalizar promedios del curso:', error);
     res.status(500).json({ error: 'Error interno al finalizar promedios del curso.' });
   }
 };
+
+
 
 // Obtener los cursos donde un estudiante está matriculado
 const obtenerCursosPorEstudiante = async (req, res) => {
@@ -360,4 +409,4 @@ const obtenerTodosLosCursos = async (req, res) => {
 };
 
 
-module.exports = { crearCurso, finalizarPromediosCurso, obtenerCursosPorDocente, obtenerCursosPorEstudiante, obtenerTodosLosCursos  };
+module.exports = { crearCurso, finalizarPromediosCurso, obtenerCursosPorDocente, obtenerCursosPorEstudiante, obtenerTodosLosCursos };

@@ -341,7 +341,7 @@ const verificarTrimestresPorMateria = async (req, res) => {
       3: trimestres.filter(t => t.numero === 3),
     };
 
-    // Función auxiliar: calcular estado general
+    // Calcular estado general
     const calcularEstado = (trimestresArr) => {
       if (trimestresArr.length === 0) return null;
 
@@ -359,51 +359,51 @@ const verificarTrimestresPorMateria = async (req, res) => {
       return null;
     };
 
-    // Calcular estado general de cada trimestre
+    // Estados
     const t1Estado = calcularEstado(grupo[1]);
     const t2Estado = calcularEstado(grupo[2]);
     const t3Estado = calcularEstado(grupo[3]);
 
-    // Construir respuesta
+    // Construir respuesta 
     const respuesta = {
+      curso_id: curso._id, 
       curso: `${curso.nombre} ${curso.paralelo}`,
       materia: materia.nombre,
       descripcion: materia.descripcion,
       trimestres: {
         trimestre_1: grupo[1].length > 0
           ? {
-            existe: true,
-            cantidad: grupo[1].length,
-            ids: grupo[1].map(t => t._id),
-            estado: t1Estado?.estado,
-            mensaje: t1Estado?.mensaje
-          }
+              existe: true,
+              cantidad: grupo[1].length,
+              ids: grupo[1].map(t => t._id),
+              estado: t1Estado?.estado,
+              mensaje: t1Estado?.mensaje
+            }
           : { existe: false, mensaje: 'Trimestre 1 aún no ha sido creado.' },
 
         trimestre_2: grupo[2].length > 0
           ? {
-            existe: true,
-            cantidad: grupo[2].length,
-            ids: grupo[2].map(t => t._id),
-            estado: t2Estado?.estado,
-            mensaje: t2Estado?.mensaje
-          }
+              existe: true,
+              cantidad: grupo[2].length,
+              ids: grupo[2].map(t => t._id),
+              estado: t2Estado?.estado,
+              mensaje: t2Estado?.mensaje
+            }
           : { existe: false, mensaje: 'Trimestre 2 aún no ha sido creado.' },
 
         trimestre_3: grupo[3].length > 0
           ? {
-            existe: true,
-            cantidad: grupo[3].length,
-            ids: grupo[3].map(t => t._id),
-            estado: t3Estado?.estado,
-            mensaje: t3Estado?.mensaje
-          }
+              existe: true,
+              cantidad: grupo[3].length,
+              ids: grupo[3].map(t => t._id),
+              estado: t3Estado?.estado,
+              mensaje: t3Estado?.mensaje
+            }
           : { existe: false, mensaje: 'Trimestre 3 aún no ha sido creado.' },
       }
     };
 
     res.status(200).json(respuesta);
-
   } catch (error) {
     console.error('Error al verificar trimestres por materia:', error);
     res.status(500).json({ error: 'Error interno al verificar trimestres por materia.' });

@@ -328,5 +328,96 @@ const actualizarAsistenciaCurso = async (req, res) => {
   }
 };
 
+const obtenerHistorialAsistenciaEstudiante = async (req, res) => {
+  try {
+    await connectDB();
 
-module.exports = { obtenerAsistenciaCurso, registrarAsistenciaCurso, actualizarAsistenciaCurso };
+    const { cursoId, estudianteId } = req.params;
+
+    if (!cursoId || !estudianteId) {
+      return res.status(400).json({
+        error: 'Debes enviar cursoId y estudianteId en la URL.'
+      });
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(cursoId) ||
+      !mongoose.Types.ObjectId.isValid(estudianteId)
+    ) {
+      return res.status(400).json({
+        error: 'Los IDs enviados no son válidos.'
+      });
+    }
+
+    const cursoObjectId = new mongoose.Types.ObjectId(cursoId);
+    const estudianteObjectId = new mongoose.Types.ObjectId(estudianteId);
+
+    // Buscar el curso (solo info básica)
+    const curso = await Curso.findById(cursoObjectId)
+      .select('nombre nivel paralelo')
+      .lean();
+
+    if (!curso) {
+      return res.status(404).json({
+        error: 'Curso no encontrado.'
+      });
+    }
+
+    // Buscar al estudiante
+    const estudiante = await Usuario.findById(estudianteObjectId)
+      .select('nombres apellidos')
+      .lean();
+
+    if (!estudiante) {
+      return res.status(404).json({
+        error: 'Estudiante no encontrado.'
+      });
+    }
+
+    // Buscar todas las asistencias del curso que correspondan al estudiante
+    const asistencias = await Asistencia.find({
+      curso_id: cursoObjectId,
+      estudiante_id: estudianteObjectId
+    })
+      .select('fecha estado')
+      .sort({ fecha: -1 })
+      .lean();
+
+    // Si no hay registros, devolver vacío
+    if (asistencias.length === 0) {
+      return res.status(200).json({
+        curso: `${curso.nombre} ${curso.nivel}°${curso.paralelo}`,
+        estudiante: `${estudiante.nombres} ${estudiante.apellidos}`,
+        total_registros: 0,
+        historial: []
+      });
+    }
+
+    // Totales por estado
+    const total_presentes = asistencias.filter(a => a.estado === 'Presente').length;
+    const total_ausentes = asistencias.filter(a => a.estado === 'Ausente').length;
+    const total_justificados = asistencias.filter(a => a.estado === 'Justificado').length;
+
+    // Respuesta final
+    res.status(200).json({
+      curso: `${curso.nombre} ${curso.nivel}°${curso.paralelo}`,
+      estudiante: `${estudiante.nombres} ${estudiante.apellidos}`,
+      total_registros: asistencias.length,
+      total_presentes,
+      total_ausentes,
+      total_justificados,
+      historial: asistencias.map(a => ({
+        fecha: a.fecha,
+        estado: a.estado
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error al obtener historial de asistencia:', error);
+    res.status(500).json({
+      error: 'Error interno al obtener el historial de asistencia.'
+    });
+  }
+};
+
+module.exports = { obtenerAsistenciaCurso, registrarAsistenciaCurso, actualizarAsistenciaCurso, obtenerHistorialAsistenciaEstudiante };

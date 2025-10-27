@@ -149,19 +149,19 @@ const finalizarPromediosCurso = async (req, res) => {
       return res.status(400).json({ error: 'ID de curso inválido.' });
     }
 
-    // 🔹 Buscar curso
+    // Buscar curso
     const curso = await Curso.findById(curso_id).lean();
     if (!curso) {
       return res.status(404).json({ error: 'Curso no encontrado.' });
     }
 
-    // 🔹 Buscar materias del curso
+    // Buscar materias del curso
     const materias = await Materia.find({ curso_id }).lean();
     if (materias.length === 0) {
       return res.status(400).json({ error: 'El curso no tiene materias registradas.' });
     }
 
-    // 🔹 Buscar trimestres de todas las materias del curso
+    // Buscar trimestres de todas las materias del curso
     const materiaIds = materias.map(m => m._id.toString());
     const Trimestre = require('../models/trimestres.models');
     const trimestres = await Trimestre.find({ materia_id: { $in: materiaIds } }).lean();
@@ -170,7 +170,7 @@ const finalizarPromediosCurso = async (req, res) => {
       return res.status(400).json({ error: 'No se encontraron trimestres para las materias del curso.' });
     }
 
-    // 🔹 Estudiantes a procesar
+    // Estudiantes a procesar
     const estudiantesProcesar = estudiante_id
       ? [estudiante_id]
       : curso.estudiantes.map(e => e.toString());
@@ -179,10 +179,10 @@ const finalizarPromediosCurso = async (req, res) => {
     const pendientes = [];
     const yaGuardados = [];
 
-    console.log('📘 Procesando curso:', curso.nombre);
-    console.log('🔹 Estudiantes en curso:', estudiantesProcesar.length);
-    console.log('🔹 Materias encontradas:', materias.length);
-    console.log('🔹 Trimestres encontrados:', trimestres.length);
+    console.log('Procesando curso:', curso.nombre);
+    console.log('Estudiantes en curso:', estudiantesProcesar.length);
+    console.log('Materias encontradas:', materias.length);
+    console.log('Trimestres encontrados:', trimestres.length);
 
     // =======================================================
     for (const estId of estudiantesProcesar) {
@@ -212,7 +212,7 @@ const finalizarPromediosCurso = async (req, res) => {
 
         const cerrados = trimestresMat.filter(t => t.estado === 'cerrado');
         if (cerrados.length < 3) {
-          console.log(`⚠️ Estudiante ${estId} tiene trimestres sin cerrar en materia ${materiaId}`);
+          console.log(`Estudiante ${estId} tiene trimestres sin cerrar en materia ${materiaId}`);
           continue;
         }
 
@@ -265,7 +265,7 @@ const finalizarPromediosCurso = async (req, res) => {
         }
       );
 
-      console.log(`✅ Estudiante ${estId} - promedio final: ${promedioFinal} (${estado})`);
+      console.log(`Estudiante ${estId} - promedio final: ${promedioFinal} (${estado})`);
 
       resultados.push({
         estudiante_id: estId,
@@ -275,7 +275,6 @@ const finalizarPromediosCurso = async (req, res) => {
       });
     }
 
-    // =======================================================
     res.status(200).json({
       mensaje: 'Promedios del curso calculados correctamente.',
       curso_id,
@@ -289,7 +288,7 @@ const finalizarPromediosCurso = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error al finalizar promedios del curso:', error);
+    console.error('Error al finalizar promedios del curso:', error);
     res.status(500).json({ error: 'Error interno al finalizar promedios del curso.' });
   }
 };
@@ -313,26 +312,25 @@ const getCartillaNotas = async (req, res) => {
       });
     }
 
-    // 🔹 Buscar los estudiantes
+    // Buscar los estudiantes
     const idsEstudiantes = curso.notas_finales.map(n => n.estudiante_id);
     const estudiantes = await Usuario.find({ _id: { $in: idsEstudiantes } })
       .select('_id nombres apellidos')
       .lean();
 
-    // 🔹 Buscar todos los trimestres de esos estudiantes y sus materias
+    // Buscar todos los trimestres de esos estudiantes y sus materias
     const trimestres = await Trimestre.find({
       estudiante_id: { $in: idsEstudiantes }
     })
       .select('_id numero promedio_trimestre materia_id estudiante_id')
       .lean();
 
-    // 🔹 Construir cartilla
+    // Construir cartilla
     const cartilla = curso.notas_finales.map(nota => {
       const estudiante = estudiantes.find(
         e => e._id.toString() === nota.estudiante_id.toString()
       );
 
-      // 🔹 Añadir detalle de materias con sus trimestres
       const detalle_materias = nota.detalle_materias.map(m => {
         const trimestresMateria = trimestres
           .filter(
@@ -357,9 +355,8 @@ const getCartillaNotas = async (req, res) => {
 
       return {
         estudiante_id: nota.estudiante_id,
-        nombre_estudiante: estudiante
-          ? `${estudiante.apellidos} ${estudiante.nombres}`
-          : 'Desconocido',
+        nombres: estudiante ? estudiante.nombres : 'Desconocido',
+        apellidos: estudiante ? estudiante.apellidos : 'Desconocido',
         promedio_curso: nota.promedio_curso,
         estado: nota.estado,
         detalle_materias
@@ -373,7 +370,7 @@ const getCartillaNotas = async (req, res) => {
       cartilla
     });
   } catch (error) {
-    console.error('❌ Error al obtener cartilla de notas:', error);
+    console.error('Error al obtener cartilla de notas:', error);
     return res.status(500).json({
       mensaje: 'Error al obtener cartilla final del curso.',
       error: error.message

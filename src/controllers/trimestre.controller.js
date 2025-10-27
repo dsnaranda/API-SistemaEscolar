@@ -4,6 +4,7 @@ const Curso = require('../models/cursos.models');
 const Usuario = require('../models/usuarios.models');
 const mongoose = require('mongoose');
 const connectDB = require('../config/db');
+const Actividad = require('../models/actividades.models');
 
 // Crear trimestres masivamente para todas las materias y estudiantes del curso
 const crearTrimestresPorCurso = async (req, res) => {
@@ -128,7 +129,7 @@ const obtenerTrimestreDetallado = async (req, res) => {
       ? `${estudiante.nombres} ${estudiante.apellidos}`
       : 'Estudiante no encontrado';
 
-    // Obtener materia y curso + docente
+    // Obtener materia, curso y docente
     const materia = await Materia.findById(trimestre.materia_id).lean();
     let nombreMateria = 'Materia no encontrada';
     let nombreDocente = 'Docente no asignado';
@@ -146,7 +147,31 @@ const obtenerTrimestreDetallado = async (req, res) => {
       }
     }
 
-    // Responder con toda la información
+    // Reemplazar IDs de actividades por sus datos reales
+    const parametrosDetallados = await Promise.all(
+      trimestre.parametros.map(async (param) => {
+        const actividadesDetalladas = await Promise.all(
+          (param.actividades || []).map(async (actividadId) => {
+            const actividad = await Actividad.findById(actividadId).lean();
+            if (!actividad) {
+              return { _id: actividadId, nombre: 'Actividad no encontrada', descripcion: '' };
+            }
+            return {
+              _id: actividad._id,
+              nombre: actividad.nombre,
+              descripcion: actividad.descripcion || ''
+            };
+          })
+        );
+
+        return {
+          ...param,
+          actividades: actividadesDetalladas
+        };
+      })
+    );
+
+    // Responder con toda la información enriquecida
     res.status(200).json({
       _id: trimestre._id,
       numero: trimestre.numero,
@@ -156,8 +181,9 @@ const obtenerTrimestreDetallado = async (req, res) => {
       curso: nombreCurso,
       docente: nombreDocente,
       estudiante: nombreEstudiante,
-      parametros: trimestre.parametros
+      parametros: parametrosDetallados
     });
+
   } catch (error) {
     console.error('Error al obtener trimestre detallado:', error);
     res.status(500).json({ error: 'Error al obtener trimestre detallado' });

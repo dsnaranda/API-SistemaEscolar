@@ -476,4 +476,97 @@ const crearTrimestresPorMateria = async (req, res) => {
   }
 };
 
-module.exports = { crearTrimestresPorCurso, obtenerTrimestreDetallado, cerrarTrimestreIndividual, cerrarTrimestresPorMateria, verificarTrimestresPorMateria, crearTrimestresPorMateria };
+const verificarTrimestrePorMateriaYNumero = async (req, res) => {
+  try {
+    await connectDB();
+    const { materia_id, numero } = req.params;
+
+    // Validar parámetros
+    if (!materia_id || !numero) {
+      return res.status(400).json({ error: 'Debe enviar materia_id y número de trimestre.' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(materia_id)) {
+      return res.status(400).json({ error: 'ID de materia inválido.' });
+    }
+
+    const numeroTrimestre = Number(numero);
+    if (![1, 2, 3].includes(numeroTrimestre)) {
+      return res.status(400).json({ error: 'El número de trimestre solo puede ser 1, 2 o 3.' });
+    }
+
+    // Buscar la materia y curso asociado
+    const materia = await Materia.findById(materia_id).lean();
+    if (!materia) {
+      return res.status(404).json({ error: 'Materia no encontrada.' });
+    }
+
+    const curso = await Curso.findById(materia.curso_id).populate('estudiantes');
+    if (!curso) {
+      return res.status(404).json({ error: 'Curso asociado no encontrado.' });
+    }
+
+    // Buscar todos los trimestres existentes de esa materia y número
+    const trimestres = await Trimestre.find({ materia_id, numero: numeroTrimestre })
+      .select('_id estudiante_id promedio_trimestre estado')
+      .lean();
+
+    // Crear un mapa rápido de estudiante -> trimestre
+    const mapaTrimestres = new Map();
+    trimestres.forEach(t => {
+      mapaTrimestres.set(t.estudiante_id.toString(), t);
+    });
+
+    const listaFinal = [];
+    const faltantes = [];
+
+    // Recorrer todos los estudiantes del curso
+    for (const estudiante of curso.estudiantes) {
+      const trimestre = mapaTrimestres.get(estudiante._id.toString());
+
+      if (trimestre) {
+        listaFinal.push({
+          estudiante_id: estudiante._id,
+          nombres: estudiante.nombres,
+          apellidos: estudiante.apellidos,
+          promedio_trimestre: trimestre.promedio_trimestre ?? null,
+          estado: trimestre.estado,
+          trimestre_id: trimestre._id
+        });
+      } else {
+        listaFinal.push({
+          estudiante_id: estudiante._id,
+          nombres: estudiante.nombres,
+          apellidos: estudiante.apellidos,
+          promedio_trimestre: null,
+          estado: 'no creado',
+          trimestre_id: null
+        });
+        faltantes.push({
+          estudiante_id: estudiante._id,
+          nombres: estudiante.nombres,
+          apellidos: estudiante.apellidos
+        });
+      }
+    }
+
+    const respuesta = {
+      materia: materia.nombre,
+      curso: `${curso.nombre} ${curso.paralelo}`,
+      trimestre_numero: numeroTrimestre,
+      total_estudiantes_curso: curso.estudiantes.length,
+      total_trimestres_creados: trimestres.length,
+      total_faltantes: faltantes.length,
+      faltantes,
+      estudiantes: listaFinal
+    };
+
+    res.status(200).json(respuesta);
+
+  } catch (error) {
+    console.error('Error al verificar trimestres por materia y número:', error);
+    res.status(500).json({ error: 'Error interno al verificar trimestres.' });
+  }
+};
+
+module.exports = { crearTrimestresPorCurso, obtenerTrimestreDetallado, cerrarTrimestreIndividual, cerrarTrimestresPorMateria, verificarTrimestresPorMateria, crearTrimestresPorMateria, verificarTrimestrePorMateriaYNumero };

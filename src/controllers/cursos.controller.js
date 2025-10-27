@@ -294,7 +294,65 @@ const finalizarPromediosCurso = async (req, res) => {
   }
 };
 
+const getCartillaNotas = async (req, res) => {
+  try {
+    const { id } = req.params;
 
+    // Buscar el curso
+    const curso = await Curso.findById(id).lean();
+    if (!curso) {
+      return res.status(404).json({ mensaje: 'Curso no encontrado.' });
+    }
+
+    // Si no hay notas_finales
+    if (!curso.notas_finales || curso.notas_finales.length === 0) {
+      return res.status(200).json({
+        mensaje: 'El curso no tiene notas registradas aún.',
+        curso_id: id,
+        total_estudiantes: 0,
+        cartilla: []
+      });
+    }
+
+    // Obtener los IDs de estudiantes para traer sus nombres
+    const idsEstudiantes = curso.notas_finales.map(n => n.estudiante_id);
+    const estudiantes = await Usuario.find({ _id: { $in: idsEstudiantes } })
+      .select('_id nombres apellidos')
+      .lean();
+
+    // Armar la cartilla
+    const cartilla = curso.notas_finales.map(nota => {
+      const estudiante = estudiantes.find(e => e._id.toString() === nota.estudiante_id.toString());
+      return {
+        estudiante_id: nota.estudiante_id,
+        nombre_estudiante: estudiante
+          ? `${estudiante.nombres} ${estudiante.apellidos}`
+          : 'Desconocido',
+        promedio_curso: nota.promedio_curso,
+        estado: nota.estado,
+        detalle_materias: nota.detalle_materias.map(m => ({
+          materia_id: m.materia_id,
+          materia_nombre: m.materia_nombre,
+          promedio_materia: m.promedio_materia
+        }))
+      };
+    });
+
+    return res.status(200).json({
+      mensaje: 'Cartilla final del curso obtenida correctamente.',
+      curso_id: id,
+      total_estudiantes: cartilla.length,
+      cartilla
+    });
+
+  } catch (error) {
+    console.error('Error al obtener cartilla de notas:', error);
+    return res.status(500).json({
+      mensaje: 'Error al obtener cartilla final del curso.',
+      error: error.message
+    });
+  }
+};
 
 // Obtener los cursos donde un estudiante está matriculado
 const obtenerCursosPorEstudiante = async (req, res) => {
@@ -409,4 +467,4 @@ const obtenerTodosLosCursos = async (req, res) => {
 };
 
 
-module.exports = { crearCurso, finalizarPromediosCurso, obtenerCursosPorDocente, obtenerCursosPorEstudiante, obtenerTodosLosCursos };
+module.exports = { crearCurso, finalizarPromediosCurso, obtenerCursosPorDocente, obtenerCursosPorEstudiante, obtenerTodosLosCursos, getCartillaNotas };

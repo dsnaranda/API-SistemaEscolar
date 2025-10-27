@@ -296,15 +296,14 @@ const finalizarPromediosCurso = async (req, res) => {
 
 const getCartillaNotas = async (req, res) => {
   try {
-    const { id } = req.params;
+    await connectDB(); // ✅ conexión asegurada antes de cualquier consulta
 
-    // Buscar el curso
+    const { id } = req.params;
     const curso = await Curso.findById(id).lean();
     if (!curso) {
       return res.status(404).json({ mensaje: 'Curso no encontrado.' });
     }
 
-    // Si no hay notas_finales
     if (!curso.notas_finales || curso.notas_finales.length === 0) {
       return res.status(200).json({
         mensaje: 'El curso no tiene notas registradas aún.',
@@ -314,13 +313,11 @@ const getCartillaNotas = async (req, res) => {
       });
     }
 
-    // Obtener los IDs de estudiantes para traer sus nombres
     const idsEstudiantes = curso.notas_finales.map(n => n.estudiante_id);
     const estudiantes = await Usuario.find({ _id: { $in: idsEstudiantes } })
       .select('_id nombres apellidos')
       .lean();
 
-    // Armar la cartilla
     const cartilla = curso.notas_finales.map(nota => {
       const estudiante = estudiantes.find(e => e._id.toString() === nota.estudiante_id.toString());
       return {

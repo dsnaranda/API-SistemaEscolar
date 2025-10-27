@@ -113,6 +113,7 @@ const obtenerTrimestreDetallado = async (req, res) => {
     await connectDB();
     const { id } = req.params;
 
+    // Validar el ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'ID de trimestre inválido' });
     }
@@ -154,12 +155,23 @@ const obtenerTrimestreDetallado = async (req, res) => {
           (param.actividades || []).map(async (actividadId) => {
             const actividad = await Actividad.findById(actividadId).lean();
             if (!actividad) {
-              return { _id: actividadId, nombre: 'Actividad no encontrada', descripcion: '' };
+              return {
+                _id: actividadId,
+                nombre: 'Actividad no encontrada',
+                descripcion: '',
+                nota: null,
+                fecha_registro: null,
+                fecha_calificado: null
+              };
             }
+
             return {
               _id: actividad._id,
               nombre: actividad.nombre,
-              descripcion: actividad.descripcion || ''
+              descripcion: actividad.descripcion || '',
+              nota: actividad.nota ?? null,
+              fecha_registro: actividad.fecha_registro || null,
+              fecha_calificado: actividad.fecha_calificado || null
             };
           })
         );
@@ -171,7 +183,7 @@ const obtenerTrimestreDetallado = async (req, res) => {
       })
     );
 
-    // Responder con toda la información enriquecida
+    // Respuesta completa
     res.status(200).json({
       _id: trimestre._id,
       numero: trimestre.numero,

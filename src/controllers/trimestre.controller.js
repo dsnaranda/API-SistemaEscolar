@@ -233,8 +233,13 @@ const cerrarTrimestresPorMateria = async (req, res) => {
       const incompletos = trimestre.parametros.filter(p => p.promedio_parametro === null);
 
       if (incompletos.length > 0) {
+        // Buscar estudiante
+        const estudiante = await Estudiante.findById(trimestre.estudiante_id).select('nombres apellidos');
+
         pendientes.push({
           estudiante_id: trimestre.estudiante_id,
+          nombres: estudiante?.nombres || 'Desconocido',
+          apellidos: estudiante?.apellidos || '',
           parametros_pendientes: incompletos.map(p => p.nombre)
         });
         continue;
@@ -261,6 +266,7 @@ const cerrarTrimestresPorMateria = async (req, res) => {
     res.status(500).json({ error: 'Error interno al cerrar trimestres.' });
   }
 };
+
 
 const verificarTrimestresPorMateria = async (req, res) => {
   try {
